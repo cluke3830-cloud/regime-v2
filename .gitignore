@@ -4,21 +4,23 @@ __pycache__/
 *$py.class
 *.so
 
-# Distribution / packaging
+# Distribution / packaging — anchored to repo root so they don't
+# accidentally match nested directories like dashboard/lib (Next.js
+# path-alias target for @/lib/*).
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
