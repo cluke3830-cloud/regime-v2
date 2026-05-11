@@ -126,11 +126,18 @@ def deflated_sharpe(
     if n_trials < 1:
         raise ValueError(f"n_trials must be >= 1, got {n_trials}")
 
-    sr = float(r.mean() / sigma * np.sqrt(ann_factor))
+    # Mertens (2002) variance correction must use per-period SR, not
+    # annualised. Feeding annualised SR into the skew/kurt terms inflates
+    # sr_var enormously, saturating the z-score to ~1.0 for all strategies.
+    sr_period = float(r.mean() / sigma)              # per-period (no √252)
+    sr = sr_period * np.sqrt(ann_factor)             # annualised (returned)
     g3 = float(stats.skew(r, bias=False))
     g4 = float(stats.kurtosis(r, fisher=False, bias=False))
 
-    sr_var = (1.0 - g3 * sr + ((g4 - 1.0) / 4.0) * sr ** 2) / (T - 1)
+    # Variance of per-period SR estimator (Mertens 2002)
+    sr_var_period = (1.0 - g3 * sr_period + ((g4 - 1.0) / 4.0) * sr_period ** 2) / (T - 1)
+    # Scale to annualised units (Var[√252 · X] = 252 · Var[X])
+    sr_var = sr_var_period * ann_factor
     sr_std = float(np.sqrt(max(sr_var, 1e-12)))
 
     if n_trials == 1:

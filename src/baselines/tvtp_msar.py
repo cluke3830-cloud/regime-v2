@@ -328,7 +328,10 @@ def make_tvtp_msar_strategy(
             + probs["p_high_vol"] * state_positions[1]
         )
 
-        # Align to features_test.index, fill missing with 0 (no position)
+        # Causal alignment fix: position[t] must use only info through t-1.
+        # The filtered prob P(state | r_1...r_t) conditions on bar-t's return,
+        # so shift by 1 before the harness multiplies position[t] * return[t].
+        position_series = position_series.shift(1).fillna(0.0)
         aligned = position_series.reindex(features_test.index).fillna(0.0)
         return aligned.to_numpy(dtype=float)
 

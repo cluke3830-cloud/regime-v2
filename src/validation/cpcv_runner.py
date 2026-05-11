@@ -203,7 +203,7 @@ def run_cpcv_validation(
     n_test_groups: int = 2,
     embargo_pct: float = 0.01,
     label_horizons: Optional[np.ndarray] = None,
-    n_trials: int = 100,
+    n_trials: int = 500,
     seed: int = 42,
     ann_factor: int = ANN_FACTOR_DAILY,
 ) -> ValidationReport:
@@ -263,7 +263,6 @@ def run_cpcv_validation(
 
     path_metrics: List[PathMetrics] = []
     oos_returns: Dict[int, pd.Series] = {}
-    concat_returns: List[float] = []
 
     for path_id, (train_idx, test_idx) in enumerate(cv.split(features_df)):
         f_train = features_df.iloc[train_idx]
@@ -284,8 +283,6 @@ def run_cpcv_validation(
             index=features_df.index[test_idx],
             name=f"path_{path_id}",
         )
-        concat_returns.extend(strategy_returns.tolist())
-
         path_metrics.append(
             _compute_path_metrics(path_id, strategy_returns, ann_factor)
         )
@@ -295,11 +292,21 @@ def run_cpcv_validation(
     dds = np.array([pm.max_drawdown for pm in path_metrics])
     dds = dds[~np.isnan(dds)]
 
-    concat = np.array(concat_returns, dtype=float)
-    if len(concat) >= 30 and concat.std() > 0:
-        dsr_p, dsr_sr = deflated_sharpe(
-            concat, n_trials=n_trials, ann_factor=ann_factor
-        )
+    # DSR on the median-Sharpe path's returns — NOT the concat of all 45
+    # paths. Concatenation pseudo-replicates bars (each bar appears in up to
+    # 9 paths), inflating T ~9× and saturating the z-score. The median path
+    # is a conservative, iid-valid single sample.
+    valid_paths = [(pm.sharpe, pm.path_id) for pm in path_metrics if not np.isnan(pm.sharpe)]
+    if valid_paths:
+        valid_paths.sort(key=lambda x: x[0])
+        median_path_id = valid_paths[len(valid_paths) // 2][1]
+        median_returns = oos_returns[median_path_id].to_numpy()
+        if len(median_returns) >= 30 and np.std(median_returns) > 0:
+            dsr_p, dsr_sr = deflated_sharpe(
+                median_returns, n_trials=n_trials, ann_factor=ann_factor
+            )
+        else:
+            dsr_p, dsr_sr = float("nan"), float("nan")
     else:
         dsr_p, dsr_sr = float("nan"), float("nan")
 
@@ -341,7 +348,7 @@ def run_cpcv_multi_strategy(
     n_test_groups: int = 2,
     embargo_pct: float = 0.01,
     label_horizons: Optional[np.ndarray] = None,
-    n_trials: int = 100,
+    n_trials: int = 500,
     seed: int = 42,
     ann_factor: int = ANN_FACTOR_DAILY,
 ) -> Dict[str, ValidationReport]:

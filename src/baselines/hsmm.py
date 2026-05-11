@@ -15,12 +15,10 @@ Architecture (pragmatic v1 — no hsmmlearn dependency):
   4. Fit a Weibull distribution to each state's realised durations.
      (Audit §8.3.2 specifies Weibull. With < 5 run-lengths per state
      we fall back to exponential as a Bayesian backstop.)
-  5. ``predict_proba`` returns ``hmm.predict_proba`` smoothed
-     probabilities — note: this is the SMOOTHED estimate (uses future
-     data per bar), NOT the forward filter. For strictly causal use,
-     v1.1 will swap to forward-only filtering. v1 matches the audit
-     §5.5 HMM walk-forward practice which accepts smoothed probs as the
-     standard.
+  5. ``predict_proba`` uses a Hamilton (1989) forward-only filter
+     (α-pass only). Each bar's probability conditions only on data
+     through that bar. Forward-backward smoothing was removed because
+     it conditions on future data, violating causal hygiene.
   6. ``estimate_remaining_duration`` returns survival expectation E[D|D>d]
      for the Weibull distribution conditioned on already-observed
      persistence ``d`` bars in the current state.
@@ -240,9 +238,43 @@ class DurationAwareHMM:
     # Predict
     # ----------------------------------------------------------------------
 
+    def _forward_filter(self, X: np.ndarray) -> np.ndarray:
+        """Hamilton (1989) forward-only (causal) filter.
+
+        Returns (n, k_states) filtered probabilities in RAW hmmlearn state
+        order. Uses only data through bar t to form the probability at bar t,
+        unlike hmmlearn's predict_proba which uses forward-backward smoothing
+        (future data leaks back through the backward pass).
+        """
+        n = X.shape[0]
+        try:
+            log_emit = self.hmm_._compute_log_likelihood(X)  # (n, k_states)
+            log_trans = np.log(np.maximum(self.hmm_.transmat_, 1e-300))
+            log_start = np.log(np.maximum(self.hmm_.startprob_, 1e-300))
+
+            alphas = np.zeros((n, self.k_states))
+            log_alpha = log_start + log_emit[0]
+            log_alpha -= np.logaddexp.reduce(log_alpha)
+            alphas[0] = np.exp(log_alpha)
+
+            for t in range(1, n):
+                log_alpha_prev = np.log(np.maximum(alphas[t - 1], 1e-300))
+                log_pred = np.logaddexp.reduce(
+                    log_alpha_prev[:, None] + log_trans, axis=0
+                )
+                log_alpha = log_pred + log_emit[t]
+                log_alpha -= np.logaddexp.reduce(log_alpha)
+                alphas[t] = np.exp(log_alpha)
+
+            return alphas
+        except Exception:
+            return np.full((n, self.k_states), 1.0 / self.k_states)
+
     def predict_proba(self, X: np.ndarray) -> np.ndarray:
         """Returns shape (n, k_states) state probabilities in CANONICAL
         order (column 0 = lowest variance, column K-1 = highest).
+
+        Uses forward-only (causal) filtering — no future data leaks back.
         """
         X = np.asarray(X, dtype=float)
         n = X.shape[0]
@@ -251,7 +283,7 @@ class DurationAwareHMM:
         try:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
-                probs_raw = self.hmm_.predict_proba(X)
+                probs_raw = self._forward_filter(X)
         except Exception:
             return np.full((n, self.k_states), 1.0 / self.k_states)
 
