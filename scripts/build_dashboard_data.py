@@ -175,7 +175,6 @@ def _build_asset_payload(
     # Walk-forward equity curves (each at unit notional, t-1 signal → t return)
     # ------------------------------------------------------------------
     log_ret = np.log(aligned["close"]).diff().fillna(0.0)
-    simple_ret = aligned["close"].pct_change().fillna(0.0)
 
     # 1) TVTP-MSAR champion (log-space cumsum, position in [-0.3, +1.0])
     tvtp_pos_lag = aligned["tvtp_position"].shift(1).fillna(0.0)
@@ -185,28 +184,21 @@ def _build_asset_payload(
     # 2) Buy-and-hold (log-space cumsum)
     bh_equity = np.exp(log_ret.cumsum())
 
-    # 3) 3x-Bull Bet: only hold a 3x-leveraged-equity-ETF proxy when the
-    #    rule classifier's P(Full Bull) + P(Half Bull) > 50%. Otherwise
-    #    sit in cash (return = 0). Daily compounding of 3 × simple return
-    #    captures vol drag the way real leveraged ETFs (UPRO/TQQQ/...) do.
-    #    Clip per-day return at -99% to keep equity > 0 in a black-swan
-    #    bar — real LETFs reset daily but can be wiped out the same way.
-    bull3x_signal = aligned["label"].isin([0, 1]).astype(float)
-    bull3x_signal_lag = bull3x_signal.shift(1).fillna(0.0)
-    bull3x_daily = (bull3x_signal_lag * 3.0 * simple_ret).clip(lower=-0.99)
-    bull3x_equity = (1.0 + bull3x_daily).cumprod()
+    # 3) Rule-baseline (log-space cumsum, position in [-0.3, +1.0])
+    rule_pos_lag = aligned["position"].shift(1).fillna(0.0)
+    rule_returns = rule_pos_lag * log_ret
+    rule_equity = np.exp(rule_returns.cumsum())
 
     # Truncate to last HISTORY_BARS bars for the chart
     tail = aligned.tail(HISTORY_BARS)
     tail_tvtp_eq = tvtp_equity.tail(HISTORY_BARS)
+    tail_rule_eq = rule_equity.tail(HISTORY_BARS)
     tail_bh_eq = bh_equity.tail(HISTORY_BARS)
-    tail_bull3x_eq = bull3x_equity.tail(HISTORY_BARS)
-    tail_bull3x_signal = bull3x_signal.tail(HISTORY_BARS)
     # Re-base equity curves to 1.0 at the start of the window
     if len(tail_tvtp_eq) > 0:
         tail_tvtp_eq = tail_tvtp_eq / tail_tvtp_eq.iloc[0]
+        tail_rule_eq = tail_rule_eq / tail_rule_eq.iloc[0]
         tail_bh_eq = tail_bh_eq / tail_bh_eq.iloc[0]
-        tail_bull3x_eq = tail_bull3x_eq / tail_bull3x_eq.iloc[0]
 
     history = []
     for ts, row in tail.iterrows():
@@ -225,10 +217,9 @@ def _build_asset_payload(
             "tvtp_low":  _finite(row["tvtp_low_vol"]),
             "tvtp_high": _finite(row["tvtp_high_vol"]),
             "tvtp_pos":  _finite(row["tvtp_position"]),
-            "eq_tvtp":     _finite(tail_tvtp_eq.get(ts, np.nan)),
-            "eq_bull3x":   _finite(tail_bull3x_eq.get(ts, np.nan)),
-            "eq_bh":       _finite(tail_bh_eq.get(ts, np.nan)),
-            "bull3x_in":   int(tail_bull3x_signal.get(ts, 0.0)),
+            "eq_tvtp":  _finite(tail_tvtp_eq.get(ts, np.nan)),
+            "eq_rule":  _finite(tail_rule_eq.get(ts, np.nan)),
+            "eq_bh":    _finite(tail_bh_eq.get(ts, np.nan)),
         })
 
     # Latest-bar snapshot for the asset card

@@ -30,9 +30,8 @@ export interface HistoryBar {
   tvtp_high: number | null;
   tvtp_pos: number | null;
   eq_tvtp: number | null;
-  eq_bull3x: number | null;
+  eq_rule: number | null;
   eq_bh: number | null;
-  bull3x_in: number;
 }
 
 export interface AssetPayload {
