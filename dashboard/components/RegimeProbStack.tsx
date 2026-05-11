@@ -3,12 +3,13 @@
 import {
   Area,
   AreaChart,
+  Brush,
+  CartesianGrid,
+  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Legend,
 } from "recharts";
 import type { HistoryBar } from "@/lib/types";
 import { REGIME_COLORS, REGIME_NAMES } from "@/lib/types";
@@ -33,17 +34,26 @@ export default function RegimeProbStack({
   const dates = data.map((d) => d.date);
   const tickInterval = Math.max(1, Math.floor(data.length / 8));
 
+  const lastDate = history[history.length - 1]?.date ?? "—";
+  const defaultStart = Math.max(0, data.length - 126);
+
   return (
     <div className="panel p-3">
-      <div className="mb-2">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
-          REGIME PROBABILITY STACK
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
+            REGIME PROBABILITY STACK
+          </div>
+          <div className="text-sm text-ink">
+            Posterior P(regime | features) — rule baseline, stacked to 1.0
+          </div>
         </div>
-        <div className="text-sm text-ink">
-          Posterior P(regime | features) — rule baseline, stacked to 1.0
+        <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-green" />
+          <span className="text-accent-green">LIVE · {lastDate}</span>
         </div>
       </div>
-      <div className="h-56">
+      <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 6, right: 12, bottom: 0, left: -8 }}>
             <CartesianGrid stroke="#1e2a3a" strokeDasharray="2 4" vertical={false} />
@@ -82,6 +92,14 @@ export default function RegimeProbStack({
                 isAnimationActive={false}
               />
             ))}
+            <Brush
+              dataKey="date"
+              height={20}
+              stroke="#2E75B6"
+              fill="#0f1521"
+              travellerWidth={8}
+              startIndex={defaultStart}
+            />
           </AreaChart>
         </ResponsiveContainer>
       </div>

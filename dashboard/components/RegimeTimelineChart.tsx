@@ -1,15 +1,16 @@
 "use client";
 
 import {
-  Area,
+  Brush,
+  CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  ReferenceArea,
-  CartesianGrid,
 } from "recharts";
 import { useMemo } from "react";
 import type { HistoryBar } from "@/lib/types";
@@ -51,32 +52,45 @@ export default function RegimeTimelineChart({
   history: HistoryBar[];
 }) {
   const bands = useMemo(() => detectRegimeBands(history), [history]);
-  const dates = history.map((h) => h.date);
+  const firstClose = history.find((h) => h.close !== null)?.close ?? 1;
+  const data = useMemo(
+    () =>
+      history.map((h) => ({
+        ...h,
+        norm: h.close !== null ? (h.close / firstClose) * 100 : null,
+      })),
+    [history, firstClose],
+  );
+  const dates = data.map((d) => d.date);
   const tickInterval = Math.max(1, Math.floor(history.length / 8));
 
-  // Normalize close to start = 100 for easier reading
-  const firstClose = history.find((h) => h.close !== null)?.close ?? 1;
-  const data = history.map((h) => ({
-    ...h,
-    norm: h.close !== null ? (h.close / firstClose) * 100 : null,
-  }));
+  // The latest bar — for the "TODAY" reference line + labeled dot
+  const lastBar = data[data.length - 1];
+  const lastColor = REGIME_COLORS[lastBar?.label ?? 2] ?? "#a3a3a3";
+
+  // Default zoom: last 6 months (~126 trading days)
+  const defaultStart = Math.max(0, data.length - 126);
 
   return (
     <div className="panel p-3">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
-            REGIME TIMELINE
+            REGIME TIMELINE · ZOOMABLE · LIVE THROUGH {lastBar?.date}
           </div>
           <div className="text-sm text-ink">
-            Rule-baseline 5-regime overlay on normalized close
+            Rule-baseline 5-regime overlay on normalized close. Drag the brush
+            below to zoom.
           </div>
         </div>
         <Legend />
       </div>
-      <div className="h-72">
+      <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: -8 }}>
+          <ComposedChart
+            data={data}
+            margin={{ top: 8, right: 60, bottom: 0, left: -8 }}
+          >
             <CartesianGrid stroke="#1e2a3a" strokeDasharray="2 4" vertical={false} />
             <XAxis
               dataKey="date"
@@ -106,9 +120,35 @@ export default function RegimeTimelineChart({
               stroke="#e6edf3"
               strokeWidth={1.6}
               dot={false}
+              activeDot={{ r: 4, fill: "#e6edf3", stroke: "#2E75B6", strokeWidth: 2 }}
               isAnimationActive={false}
             />
+            {lastBar && (
+              <ReferenceLine
+                x={lastBar.date}
+                stroke={lastColor}
+                strokeDasharray="2 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `TODAY · ${lastBar.regime}`,
+                  position: "top",
+                  fill: lastColor,
+                  fontSize: 10,
+                  fontFamily: "JetBrains Mono, monospace",
+                  offset: 4,
+                }}
+                ifOverflow="visible"
+              />
+            )}
             <Tooltip content={<RegimeTip />} />
+            <Brush
+              dataKey="date"
+              height={22}
+              stroke="#2E75B6"
+              fill="#0f1521"
+              travellerWidth={8}
+              startIndex={defaultStart}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

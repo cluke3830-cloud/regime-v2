@@ -48,7 +48,6 @@ export default async function AssetPage({
     notFound();
   }
 
-  const accent = REGIME_COLORS[asset.current_regime.label] ?? "#a3a3a3";
   const tvtpPos = asset.current_tvtp.position;
   const tvtpColor = tvtpPos >= 0 ? "#22c55e" : "#ef4444";
 
@@ -136,8 +135,14 @@ export default async function AssetPage({
 
           <aside className="space-y-3">
             <div className="panel p-4">
-              <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-ink-dim">
-                CURRENT REGIME PROBABILITIES
+              <div className="mb-2 flex items-center justify-between">
+                <div className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
+                  CURRENT REGIME PROBABILITIES
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider">
+                  <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-green" />
+                  <span className="text-accent-green">LIVE · {asset.as_of}</span>
+                </div>
               </div>
               <div className="space-y-2">
                 {asset.current_regime.probs.map((p, i) => {
