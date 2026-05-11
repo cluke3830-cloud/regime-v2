@@ -2,9 +2,14 @@ name: Refresh dashboard snapshots
 
 # Daily EOD regime refresh. Runs at 21:30 UTC (16:30 ET — 30 min after
 # US equity close, late enough that yfinance has settled today's bar).
-# Auto-deploy is handled by the Vercel GitHub integration: pushing a
-# commit to main with new dashboard/public/data/**.json triggers
-# Vercel to rebuild the dashboard automatically.
+#
+# Pipeline:
+#   1. Regenerate dashboard/public/data/**.json from fresh yfinance/FRED
+#   2. Commit + push refreshed JSON to main (audit trail)
+#   3. Deploy explicitly via `vercel deploy --prod --prebuilt` using the
+#      VERCEL_TOKEN secret. We don't rely on Vercel's GitHub webhook
+#      because it has been flaky for this project (occasionally drops
+#      pushes silently or rejects on author checks).
 
 on:
   schedule:
@@ -18,6 +23,10 @@ concurrency:
   group: refresh-dashboard
   cancel-in-progress: false
 
+env:
+  VERCEL_ORG_ID:     ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -26,8 +35,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Use the GITHUB_TOKEN for pushing — `contents: write` lets us push.
-          # No PAT needed.
           persist-credentials: true
 
       - name: Set up Python
@@ -48,13 +55,38 @@ jobs:
         run: python scripts/build_dashboard_data.py
 
       - name: Commit refreshed data
+        id: commit
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dashboard/public/data
           if git diff --cached --quiet; then
-            echo "no changes — markets must be closed and yfinance returned an unchanged frame"
+            echo "no changes — markets closed or yfinance returned an unchanged frame"
+            echo "changed=false" >> $GITHUB_OUTPUT
             exit 0
           fi
           git commit -m "data: daily snapshot refresh ($(date -u +%Y-%m-%d))"
           git push
+          echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Set up Node
+        if: steps.commit.outputs.changed == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Vercel CLI
+        if: steps.commit.outputs.changed == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel env (production)
+        if: steps.commit.outputs.changed == 'true'
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build (Vercel prebuilt)
+        if: steps.commit.outputs.changed == 'true'
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        if: steps.commit.outputs.changed == 'true'
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
