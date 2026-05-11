@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-05-11T22:27:33Z",
+  "universe": [
+    {
+      "ticker": "SPY",
+      "safe": "SPY",
+      "name": "S&P 500"
+    },
+    {
+      "ticker": "QQQ",
+      "safe": "QQQ",
+      "name": "Nasdaq 100"
+    },
+    {
+      "ticker": "DIA",
+      "safe": "DIA",
+      "name": "Dow Jones"
+    },
+    {
+      "ticker": "IWM",
+      "safe": "IWM",
+      "name": "Russell 2000"
+    },
+    {
+      "ticker": "EFA",
+      "safe": "EFA",
+      "name": "Developed ex-US"
+    },
+    {
+      "ticker": "EEM",
+      "safe": "EEM",
+      "name": "Emerging Markets"
+    },
+    {
+      "ticker": "GLD",
+      "safe": "GLD",
+      "name": "Gold"
+    },
+    {
+      "ticker": "TLT",
+      "safe": "TLT",
+      "name": "20Y Treasuries"
+    },
+    {
+      "ticker": "BTC-USD",
+      "safe": "BTC-USD",
+      "name": "Bitcoin"
+    },
+    {
+      "ticker": "JPY=X",
+      "safe": "JPY_X",
+      "name": "USD / JPY"
+    }
+  ]
+}
