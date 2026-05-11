@@ -39,6 +39,11 @@ if str(ROOT) not in sys.path:
 from src.baselines.hsmm import make_hsmm_strategy  # noqa: E402
 from src.baselines.ms_garch import make_ms_garch_strategy  # noqa: E402
 from src.baselines.tvtp_msar import make_tvtp_msar_strategy  # noqa: E402
+from src.regime.conformal import (  # noqa: E402
+    make_conformal_calibrated_strategy,
+    regime_xgboost_proba_fn,
+)
+from src.regime.patchtst import make_patchtst_strategy  # noqa: E402
 from src.features.aux_data import fetch_aux_data_bundle  # noqa: E402
 from src.labels.triple_barrier import triple_barrier_labels  # noqa: E402
 from src.regime.meta_stacker import (  # noqa: E402
@@ -208,6 +213,22 @@ def main() -> int:
     hsmm = make_hsmm_strategy(k_states=4)
     # Brief 3.3 — GARCH(1,1) vol-conditional sizing.
     ms_garch = make_ms_garch_strategy(target_ann_vol=0.14)
+    # Brief 4.1 — PatchTST deep ensemble (lightweight settings for CPCV
+    # wall-clock; n_seeds=2, epochs=20, seq_len=20).
+    patchtst = make_patchtst_strategy(
+        pi_up=2.0, horizon=10, seq_len=20,
+        n_seeds=2, epochs=20, batch_size=64,
+    )
+    # Brief 4.2 — Adaptive Conformal Inference wrapping xgb_v2's
+    # probability output. Calibrates to 90% target coverage.
+    conformal_xgb = make_conformal_calibrated_strategy(
+        base_proba_fn=regime_xgboost_proba_fn(
+            max_depth=3, eta=0.05, n_estimators=100,
+            subsample=0.7, colsample_bytree=0.7,
+            reg_lambda=2.0, reg_alpha=0.2, seed=42, n_jobs=1,
+        ),
+        alpha=0.10, gamma=0.005, window=500,
+    )
 
     strategies = {
         "flat": flat,
@@ -223,6 +244,8 @@ def main() -> int:
         "tvtp_msar": tvtp_msar,                    # Brief 3.1
         "hsmm": hsmm,                              # Brief 3.2
         "ms_garch": ms_garch,                      # Brief 3.3
+        "patchtst": patchtst,                      # Brief 4.1
+        "conformal_xgb": conformal_xgb,            # Brief 4.2
     }
     reports = run_cpcv_multi_strategy(
         strategies=strategies,
@@ -232,10 +255,10 @@ def main() -> int:
         n_test_groups=2,
         embargo_pct=0.01,
         label_horizons=label_horizons,
-        # Trial accounting (audit §8.1.2): 110 (Phase 1+2) + 1 (tvtp_msar)
-        # + 1 (hsmm) + 1 (ms_garch). Phase 3 adds 3 pre-registered specs
-        # with no hparam search. Total = 113; round up to 175 for safety.
-        n_trials=175,
+        # Trial accounting (audit §8.1.2): 113 (through Phase 3) +
+        # 1 (patchtst, fixed config) + 1 (conformal_xgb, fixed config).
+        # Total = 115; round up to 200 for safety.
+        n_trials=200,
         seed=42,
     )
 
@@ -263,6 +286,8 @@ def main() -> int:
         ("tvtp_msar",        reports["tvtp_msar"].sharpe_p50),
         ("hsmm",             reports["hsmm"].sharpe_p50),
         ("ms_garch",         reports["ms_garch"].sharpe_p50),
+        ("patchtst",         reports["patchtst"].sharpe_p50),
+        ("conformal_xgb",    reports["conformal_xgb"].sharpe_p50),
         ("momentum_20d",     reports["momentum_20d"].sharpe_p50),
     ]
     winner_name, winner_sharpe = max(candidates, key=lambda x: x[1])

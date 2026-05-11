@@ -1,6 +1,6 @@
 # CPCV Validation Report — Phase 1 + Phase 2.1 XGBoost (SPY 2015-2024, robustness on 'tvtp_msar')
 
-_Generated 2026-05-11T20:13:06.340896+00:00 UTC_
+_Generated 2026-05-11T22:07:06.376744+00:00 UTC_
 
 ## CPCV configuration
 
@@ -9,7 +9,7 @@ _Generated 2026-05-11T20:13:06.340896+00:00 UTC_
 - embargo: **1.00%** of sample
 - paths per strategy: **45**
 - seed: **42**
-- n_trials (DSR deflation): **175**
+- n_trials (DSR deflation): **200**
 
 ## Per-strategy results
 
@@ -28,6 +28,8 @@ _Generated 2026-05-11T20:13:06.340896+00:00 UTC_
 | `tvtp_msar` | 45 | 1.487 | 2.462 | 3.158 | 2.414 | -0.036 | 1.0000 | 2.366 |
 | `hsmm` | 45 | 0.150 | 0.752 | 1.922 | 0.882 | -0.072 | 1.0000 | 0.774 |
 | `ms_garch` | 45 | 0.101 | 1.038 | 2.111 | 1.043 | -0.112 | 1.0000 | 0.987 |
+| `patchtst` | 45 | -0.626 | 0.787 | 1.705 | 0.620 | -0.029 | 1.0000 | 0.124 |
+| `conformal_xgb` | 45 | -0.354 | 0.264 | 1.416 | 0.367 | -0.081 | 1.0000 | 0.118 |
 
 ## Probability of Backtest Overfitting (PBO)
 

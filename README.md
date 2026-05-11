@@ -66,7 +66,7 @@ Plus a **multi-asset robustness panel**: the winning strategy's
 performance across `{SPY, QQQ, DIA, IWM, EFA, EEM, GLD, TLT, BTC-USD,
 JPY=X}`. The soft gate is ≥ 70% positive OOS Sharpe + mean positive.
 
-## Current empirical results (SPY 2015-2024, 45 CPCV paths, n_trials=175)
+## Current empirical results (SPY 2015-2024, 45 CPCV paths, n_trials=200)
 
 | Strategy | Sharpe p50 | DSR Sharpe | Max-DD p50 | Verdict |
 |---|---:|---:|---:|---|
@@ -80,9 +80,11 @@ JPY=X}`. The soft gate is ≥ 70% positive OOS Sharpe + mean positive.
 | `meta_equal` (rule + momentum + B&H, equal blend) | +1.137 | +1.077 | -9.4% | Phase 2 winner |
 | `meta_ridge` (rule + momentum + B&H, Ridge-weighted) | +0.953 | +0.769 | -1.0% | matches momentum |
 | `transition_gated` (rule × `(1 - P(transition))`) | +0.773 | +0.742 | -8.7% | gate slightly hurts |
-| **`tvtp_msar`** (Hamilton 2-state MS-AR + vol-regime sizing) | **+2.462** | **+2.366** | **-3.6%** | **🏆 Phase 3 winner** |
+| **`tvtp_msar`** (Hamilton 2-state MS-AR + vol-regime sizing) | **+2.462** | **+2.366** | **-3.6%** | **🏆 Champion** |
 | `hsmm` (4-state Gaussian HMM + Weibull durations) | +0.752 | +0.774 | -7.2% | diversifier |
 | `ms_garch` (GARCH(1,1) vol-conditional sizing) | +1.038 | +0.987 | -11.2% | tier-2 baseline |
+| `patchtst` (Transformer deep ensemble, 2 seeds) | +0.787 | +0.124 | -2.9% | beats xgb, behind momentum |
+| `conformal_xgb` (xgb_v2 + Gibbs-Candès calibration) | +0.264 | +0.118 | -8.1% | calibration ≈ neutral on Sharpe |
 
 **Soft gate:** Multi-asset robustness on `tvtp_msar` across 10 tickers — **10/10 positive OOS Sharpe (100%), mean +1.300** ✅. Best assets: SPY +2.462, QQQ +2.391, DIA +2.086 (US large-caps love the 2-state vol-regime). Worst non-equity: TLT +0.240 (still positive, but DSR=0 flags it as below null expectation under deflation against 175 trials).
 
