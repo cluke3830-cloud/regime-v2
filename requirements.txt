@@ -1,0 +1,15 @@
+# Phase 1 + Phase 2 dependencies for Regime_v2.
+# Pinned to the versions used during the validation_report.md
+# generation in May 2026. Loosen only after re-running the test suite.
+
+numpy>=1.26,<3
+pandas>=2.1,<3
+scipy>=1.11,<2
+scikit-learn>=1.4,<2
+xgboost>=2.0,<4
+pyarrow>=14   # parquet engine for the data/cache directory
+yfinance>=0.2.40
+requests>=2.31
+
+# Dev
+pytest>=8.0

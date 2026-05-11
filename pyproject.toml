@@ -1,0 +1,20 @@
+[project]
+name = "regime-v2"
+version = "0.2.1"
+description = "Regime detector legendary-tier upgrade (CPCV + DSR + PBO + triple-barrier XGBoost)"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Add Regime_v2/ (this directory) to sys.path so `from src.*` works
+# without manipulation inside individual test files.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+# Treat `src` as a first-party module so isort and the linter don't try
+# to "fix" the imports by prepending the parent package name.
+src = ["src"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
