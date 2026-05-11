@@ -66,7 +66,7 @@ Plus a **multi-asset robustness panel**: the winning strategy's
 performance across `{SPY, QQQ, DIA, IWM, EFA, EEM, GLD, TLT, BTC-USD,
 JPY=X}`. The soft gate is ≥ 70% positive OOS Sharpe + mean positive.
 
-## Current empirical results (SPY 2015-2024, 45 CPCV paths, n_trials=160)
+## Current empirical results (SPY 2015-2024, 45 CPCV paths, n_trials=175)
 
 | Strategy | Sharpe p50 | DSR Sharpe | Max-DD p50 | Verdict |
 |---|---:|---:|---:|---|
@@ -77,13 +77,18 @@ JPY=X}`. The soft gate is ≥ 70% positive OOS Sharpe + mean positive.
 | `xgb_v1` (21 feat, audit defaults) | +0.129 | +0.130 | -10.9% | underfit on this regime mix |
 | `xgb_v2` (21 feat, reg-heavy) | +0.259 | +0.152 | -7.6% | best xgb variant |
 | `xgb_tuned` (nested CPCV grid) | +0.216 | +0.128 | -7.9% | tuner ≠ silver bullet |
-| **`meta_equal`** (rule + momentum + B&H, equal blend) | **+1.137** | **+1.077** | -9.4% | **🏆 winner** |
+| `meta_equal` (rule + momentum + B&H, equal blend) | +1.137 | +1.077 | -9.4% | Phase 2 winner |
 | `meta_ridge` (rule + momentum + B&H, Ridge-weighted) | +0.953 | +0.769 | -1.0% | matches momentum |
 | `transition_gated` (rule × `(1 - P(transition))`) | +0.773 | +0.742 | -8.7% | gate slightly hurts |
+| **`tvtp_msar`** (Hamilton 2-state MS-AR + vol-regime sizing) | **+2.462** | **+2.366** | **-3.6%** | **🏆 Phase 3 winner** |
+| `hsmm` (4-state Gaussian HMM + Weibull durations) | +0.752 | +0.774 | -7.2% | diversifier |
+| `ms_garch` (GARCH(1,1) vol-conditional sizing) | +1.038 | +0.987 | -11.2% | tier-2 baseline |
 
-**Soft gate:** Multi-asset robustness on `meta_equal` across 10 tickers — **9/10 positive OOS Sharpe (90%), mean +0.610** ✅. Best asset: BTC-USD +1.262; worst: TLT -0.019 (rate-hike regime hurts equal-weight).
+**Soft gate:** Multi-asset robustness on `tvtp_msar` across 10 tickers — **10/10 positive OOS Sharpe (100%), mean +1.300** ✅. Best assets: SPY +2.462, QQQ +2.391, DIA +2.086 (US large-caps love the 2-state vol-regime). Worst non-equity: TLT +0.240 (still positive, but DSR=0 flags it as below null expectation under deflation against 175 trials).
 
-**Caveat — PBO 71.11%:** Strategy-selection across this universe of variants is overfitting (audit §8.1.3 alarm zone is ≥ 0.70). Several of the 10 strategies are highly correlated (meta_equal is literally a linear combination of three other strategies), so IS-best rank flips OOS easily. The PBO is a *strategy-selection* warning, not a *strategy-performance* one — `meta_equal` itself has no tunable parameter to overfit. Phase 3 (econometric baselines) and Phase 4 (deep frontier) will introduce de-correlated voters that should bring PBO back under 0.50.
+**PBO: 13.33%** ✅ — strategy selection generalises (audit's green zone is < 50%). Phase 2 alone hit 71% (alarm); adding the three de-correlated econometric voters (TVTP-MSAR, HSMM, MS-GARCH) collapsed PBO by 5.3× — exactly what the audit predicted.
+
+**Why TVTP-MSAR wins so decisively:** the 2-state Hamilton model with leak-free forward filtering picks up SPY's bull/correction regime structure cleanly. Position mapping {+1.00, -0.30} sizes aggressively in the dominant low-vol state and de-risks (mild defense, not full short) in the high-vol state. P05 of +1.487 means even the bottom 5% of CPCV paths beats every Phase 1+2 strategy's median.
 
 ## 5-regime taxonomy
 
@@ -113,9 +118,9 @@ The rule classifier and the position-mapping layer use this taxonomy:
 | 2 | 2.2 Rule baseline (5 regimes)     | ✅ |
 | 2 | 2.3 Stacked meta-learner          | ✅ |
 | 2 | 2.4 Transition detector rebuild   | ✅ |
-| 3 | 3.1 TVTP-MSAR baseline            | ⏳ |
-| 3 | 3.2 HSMM with Weibull durations   | ⏳ |
-| 3 | 3.3 MS-GARCH                      | ⏳ |
+| 3 | 3.1 TVTP-MSAR baseline            | ✅ |
+| 3 | 3.2 HSMM with Weibull durations   | ✅ |
+| 3 | 3.3 MS-GARCH                      | ✅ |
 | 4 | 4.1 PatchTST deep ensemble        | ⏳ |
 | 4 | 4.2 Adaptive conformal calibration| ⏳ |
 | 5 | 5.1 Drift monitor                 | ⏳ |

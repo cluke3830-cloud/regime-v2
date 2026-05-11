@@ -36,6 +36,9 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from src.baselines.hsmm import make_hsmm_strategy  # noqa: E402
+from src.baselines.ms_garch import make_ms_garch_strategy  # noqa: E402
+from src.baselines.tvtp_msar import make_tvtp_msar_strategy  # noqa: E402
 from src.features.aux_data import fetch_aux_data_bundle  # noqa: E402
 from src.labels.triple_barrier import triple_barrier_labels  # noqa: E402
 from src.regime.meta_stacker import (  # noqa: E402
@@ -199,6 +202,12 @@ def main() -> int:
     transition_gated = make_transition_gated_strategy(
         horizon=5, n_estimators=80, max_depth=4, smooth_gate=True, seed=42,
     )
+    # Brief 3.1 — Hamilton MS-AR(1) baseline w/ low-vol/high-vol states.
+    tvtp_msar = make_tvtp_msar_strategy()
+    # Brief 3.2 — 4-state Gaussian HMM w/ Weibull duration distributions.
+    hsmm = make_hsmm_strategy(k_states=4)
+    # Brief 3.3 — GARCH(1,1) vol-conditional sizing.
+    ms_garch = make_ms_garch_strategy(target_ann_vol=0.14)
 
     strategies = {
         "flat": flat,
@@ -211,6 +220,9 @@ def main() -> int:
         "meta_equal": meta_equal,                  # Brief 2.3a
         "meta_ridge": meta_ridge,                  # Brief 2.3b
         "transition_gated": transition_gated,      # Brief 2.4
+        "tvtp_msar": tvtp_msar,                    # Brief 3.1
+        "hsmm": hsmm,                              # Brief 3.2
+        "ms_garch": ms_garch,                      # Brief 3.3
     }
     reports = run_cpcv_multi_strategy(
         strategies=strategies,
@@ -220,12 +232,10 @@ def main() -> int:
         n_test_groups=2,
         embargo_pct=0.01,
         label_horizons=label_horizons,
-        # Trial accounting (audit §8.1.2): 100 prior + 1 (xgb_v1) +
-        # 1 (xgb_v2) + 4 (xgb_tuned grid) + 1 (rule_baseline) +
-        # 1 (meta_equal, no search) + 1 (meta_ridge, in-sample weights) +
-        # 1 (transition_gated, no hparam search). Total = 110. Round up
-        # to 160 for safety against minor unrecorded search.
-        n_trials=160,
+        # Trial accounting (audit §8.1.2): 110 (Phase 1+2) + 1 (tvtp_msar)
+        # + 1 (hsmm) + 1 (ms_garch). Phase 3 adds 3 pre-registered specs
+        # with no hparam search. Total = 113; round up to 175 for safety.
+        n_trials=175,
         seed=42,
     )
 
@@ -250,6 +260,9 @@ def main() -> int:
         ("meta_equal",       reports["meta_equal"].sharpe_p50),
         ("meta_ridge",       reports["meta_ridge"].sharpe_p50),
         ("transition_gated", reports["transition_gated"].sharpe_p50),
+        ("tvtp_msar",        reports["tvtp_msar"].sharpe_p50),
+        ("hsmm",             reports["hsmm"].sharpe_p50),
+        ("ms_garch",         reports["ms_garch"].sharpe_p50),
         ("momentum_20d",     reports["momentum_20d"].sharpe_p50),
     ]
     winner_name, winner_sharpe = max(candidates, key=lambda x: x[1])
