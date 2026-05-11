@@ -191,8 +191,7 @@ def _build_asset_payload(
     #    captures vol drag the way real leveraged ETFs (UPRO/TQQQ/...) do.
     #    Clip per-day return at -99% to keep equity > 0 in a black-swan
     #    bar — real LETFs reset daily but can be wiped out the same way.
-    bull_prob = (aligned["p_0"].fillna(0) + aligned["p_1"].fillna(0))
-    bull3x_signal = (bull_prob > 0.5).astype(float)
+    bull3x_signal = aligned["label"].isin([0, 1]).astype(float)
     bull3x_signal_lag = bull3x_signal.shift(1).fillna(0.0)
     bull3x_daily = (bull3x_signal_lag * 3.0 * simple_ret).clip(lower=-0.99)
     bull3x_equity = (1.0 + bull3x_daily).cumprod()

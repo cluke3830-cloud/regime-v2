@@ -50,7 +50,7 @@ export default function EquityChart({
             EQUITY CURVES — 2Y WALK-FORWARD
           </div>
           <div className="text-sm text-ink">
-            TVTP-MSAR · 3× Bull Bet (rule p₀+p₁ &gt; 50%) · Buy &amp; Hold
+            TVTP-MSAR · 3× Bull Bet (active label: Full Bull or Half Bull) · Buy &amp; Hold
           </div>
         </div>
         <div className="flex gap-3 font-mono text-[11px]">
@@ -142,8 +142,8 @@ export default function EquityChart({
         </ResponsiveContainer>
       </div>
       <p className="mt-2 font-mono text-[10px] leading-relaxed text-ink-dim">
-        <span className="text-accent-amber">3× Bull Bet</span>: when the rule
-        classifier puts &gt;50% probability mass on (Full Bull + Half Bull),
+        <span className="text-accent-amber">3× Bull Bet</span>: when the
+        active regime label is Full Bull or Half Bull (post risk-off gate),
         go long a hypothetical 3× leveraged equity ETF (UPRO for SPY, TQQQ
         for QQQ, etc.). Else cash. Daily compounding of 3 × simple-return —
         captures the vol drag real LETFs experience. Signal lagged by 1 bar
