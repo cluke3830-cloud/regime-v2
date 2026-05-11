@@ -19,6 +19,10 @@ from src.validation.cpcv_runner import (
     run_cpcv_multi_strategy,
     emit_markdown_report,
 )
+from src.validation.live_replay import (
+    replay_strategy_bar_by_bar,
+    verify_no_lookahead,
+)
 from src.validation.multi_asset import (
     DEFAULT_UNIVERSE,
     default_feature_fn,
@@ -47,4 +51,6 @@ __all__ = [
     "evaluate_one_asset",
     "evaluate_multi_asset",
     "multi_asset_summary",
+    "verify_no_lookahead",
+    "replay_strategy_bar_by_bar",
 ]

@@ -121,12 +121,14 @@ The rule classifier and the position-mapping layer use this taxonomy:
 | 3 | 3.1 TVTP-MSAR baseline            | ✅ |
 | 3 | 3.2 HSMM with Weibull durations   | ✅ |
 | 3 | 3.3 MS-GARCH                      | ✅ |
-| 4 | 4.1 PatchTST deep ensemble        | ⏳ |
-| 4 | 4.2 Adaptive conformal calibration| ⏳ |
-| 5 | 5.1 Drift monitor                 | ⏳ |
-| 5 | 5.2 Intraday realised variance    | ⏳ |
-| 5 | 5.3 Live-replay test harness      | ⏳ |
-| 5 | 5.4 Numba HMM forward filter      | ⏳ |
+| 4 | 4.1 PatchTST deep ensemble        | ✅ |
+| 4 | 4.2 Adaptive conformal calibration| ✅ |
+| 5 | 5.1 Drift monitor                 | ✅ |
+| 5 | 5.2 Intraday realised variance    | ✅ |
+| 5 | 5.3 Live-replay test harness      | ✅ |
+| 5 | 5.4 Numba HMM forward filter      | ✅ |
+
+**🏆 All 17 audit briefs shipped. 225/225 tests green.**
 
 ## References
 

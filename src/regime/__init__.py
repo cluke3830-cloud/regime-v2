@@ -22,6 +22,17 @@ from src.regime.rule_baseline import (
     compute_rule_regime_sequence,
     rule_baseline_strategy,
 )
+from src.regime.conformal import (
+    AdaptiveConformal,
+    make_conformal_calibrated_strategy,
+    regime_xgboost_proba_fn,
+)
+from src.regime.patchtst import (
+    DeepEnsembleTransformer,
+    TransformerRegimeClassifier,
+    build_sequences,
+    make_patchtst_strategy,
+)
 from src.regime.transition_detector import (
     TransitionDetector,
     evaluate_detector_metrics,
@@ -52,4 +63,11 @@ __all__ = [
     "TransitionDetector",
     "evaluate_detector_metrics",
     "make_transition_gated_strategy",
+    "TransformerRegimeClassifier",
+    "DeepEnsembleTransformer",
+    "build_sequences",
+    "make_patchtst_strategy",
+    "AdaptiveConformal",
+    "make_conformal_calibrated_strategy",
+    "regime_xgboost_proba_fn",
 ]
