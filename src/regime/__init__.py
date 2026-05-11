@@ -27,12 +27,21 @@ from src.regime.conformal import (
     make_conformal_calibrated_strategy,
     regime_xgboost_proba_fn,
 )
-from src.regime.patchtst import (
-    DeepEnsembleTransformer,
-    TransformerRegimeClassifier,
-    build_sequences,
-    make_patchtst_strategy,
-)
+# PatchTST pulls in torch (~700MB). Guard so consumers that don't need
+# the deep-learning voter (e.g. the dashboard snapshot generator) can
+# still `from src.regime import ...` without installing torch.
+try:
+    from src.regime.patchtst import (
+        DeepEnsembleTransformer,
+        TransformerRegimeClassifier,
+        build_sequences,
+        make_patchtst_strategy,
+    )
+except ImportError:
+    DeepEnsembleTransformer = None  # type: ignore[assignment]
+    TransformerRegimeClassifier = None  # type: ignore[assignment]
+    build_sequences = None  # type: ignore[assignment]
+    make_patchtst_strategy = None  # type: ignore[assignment]
 from src.regime.transition_detector import (
     TransitionDetector,
     evaluate_detector_metrics,
