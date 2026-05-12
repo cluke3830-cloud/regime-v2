@@ -436,10 +436,6 @@ def compute_rule_regime_sequence(features_v2: pd.DataFrame) -> pd.DataFrame:
     # 0 in normed-space = deepest DD, 1 in normed-space = at the high.
     # That direction matches all the weight signs we picked.
 
-    # Raw shock and raw DD for the riskoff_confirm gate (NOT normed).
-    shock_raw = features_v2["shock_z"].to_numpy(dtype=float)
-    dd_raw    = (-features_v2["drawdown_252"]).clip(lower=0).to_numpy(dtype=float)
-
     inputs = normed[V2_FEATURE_ORDER].to_numpy(dtype=float)
     vol_n  = normed["vol_ewma"].to_numpy(dtype=float)
     n = len(features_v2)
@@ -449,17 +445,15 @@ def compute_rule_regime_sequence(features_v2: pd.DataFrame) -> pd.DataFrame:
     prev_vol: Optional[float] = None
     stab = Stabilizer()
 
+    # Pure-market-state classification: label = stabilized softmax argmax.
+    # The _riskoff_confirm gate (drawdown > 15% OR shock > 3.5σ → force Full Bear)
+    # was removed — we want the model's view of the market, not a rule override.
     for t in range(n):
         sc = _row_score(inputs[t])
         sc = _risk_condition(sc, stab.current, stab.persist, vol_n[t], prev_vol)
         probs = _softmax(sc)
         raw_label = int(np.argmax(probs))
-        confirmed = _riskoff_confirm(
-            raw_label, probs,
-            shock_raw=float(shock_raw[t]) if np.isfinite(shock_raw[t]) else 0.0,
-            dd_raw=float(dd_raw[t])    if np.isfinite(dd_raw[t])    else 0.0,
-        )
-        stable = stab.step(confirmed, probs)
+        stable = stab.step(raw_label, probs)
         probs_out[t] = probs
         labels_out[t] = stable
         prev_vol = vol_n[t]

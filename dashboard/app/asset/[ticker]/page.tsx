@@ -147,14 +147,11 @@ export default async function AssetPage({
               <div className="space-y-2">
                 {(() => {
                   const probs = asset.current_regime.probs;
-                  const validProbs = probs.map((p) => p ?? 0);
-                  const argmax = validProbs.indexOf(Math.max(...validProbs));
                   const activeLabel = asset.current_regime.label;
                   return probs.map((p, i) => {
                     const c = REGIME_COLORS[i] ?? "#a3a3a3";
                     const w = p === null ? 0 : Math.max(0, Math.min(1, p));
                     const isActive = i === activeLabel;
-                    const isArgmax = i === argmax;
                     return (
                       <div key={i}>
                         <div className="flex items-center justify-between font-mono text-[11px]">
@@ -169,18 +166,9 @@ export default async function AssetPage({
                                   backgroundColor: c,
                                   color: "#0a0e14",
                                 }}
-                                title="Active regime — what the dashboard uses for allocation"
+                                title="Current market regime"
                               >
                                 ★ ACTIVE
-                              </span>
-                            )}
-                            {isArgmax && !isActive && (
-                              <span
-                                className="rounded-sm border px-1 py-px text-[8px] font-bold uppercase tracking-wider text-ink-muted"
-                                style={{ borderColor: c, color: c }}
-                                title="Highest softmax probability — but overridden by the risk-off gate"
-                              >
-                                argmax
                               </span>
                             )}
                           </span>
@@ -201,32 +189,6 @@ export default async function AssetPage({
                   });
                 })()}
               </div>
-              {(() => {
-                const probs = asset.current_regime.probs.map((p) => p ?? 0);
-                const argmax = probs.indexOf(Math.max(...probs));
-                const active = asset.current_regime.label;
-                if (argmax === active) return null;
-                const promoted = active === 4 && argmax !== 4;
-                const demoted = argmax === 4 && active !== 4;
-                return (
-                  <div className="mt-3 rounded border border-bg-ring bg-bg/40 p-2 font-mono text-[10px] leading-relaxed text-ink-muted">
-                    <span className="text-accent-amber">⚠ RISK-OFF GATE FIRED.</span>{" "}
-                    Softmax argmax was{" "}
-                    <span style={{ color: REGIME_COLORS[argmax] }}>
-                      {["Full Bull", "Half Bull", "Chop", "Half Bear", "Full Bear"][argmax]}
-                    </span>
-                    , but the rule classifier{" "}
-                    {promoted
-                      ? "PROMOTED to Full Bear because raw drawdown > 15% or shock > 3.5σ "
-                      : demoted
-                      ? "DEMOTED away from Full Bear (tail-event gate not met)"
-                      : "stabilizer kept the prior label (hysteresis or min-persistence)"}
-                    .{" "}
-                    {promoted &&
-                      "Audit §5.3.4 — protects against false-positive bull calls during deep drawdowns."}
-                  </div>
-                );
-              })()}
             </div>
 
             <TvtpBand history={asset.history} />
