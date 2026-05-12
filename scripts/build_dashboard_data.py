@@ -382,6 +382,21 @@ def main(out_dir: Optional[Path] = None) -> int:
         json.dump(assets_index, fh, indent=2)
     print(f"[snapshot] wrote {out_dir / 'assets.json'}")
 
+    # Sanity gate: refuse to ship a near-empty summary. yfinance occasionally
+    # throttles or fails all 10 tickers in one go, and on that day the daily
+    # GHA used to commit an empty summary.json — wiping the dashboard's grid
+    # until the next manual rebuild. Fail loudly so the GHA step fails and
+    # the previous good summary stays on `main`.
+    n_required = max(1, int(len(DEFAULT_UNIVERSE) * 0.7))  # ≥70% coverage
+    if len(summary_assets) < n_required:
+        print(
+            f"[snapshot] ERROR: only {len(summary_assets)}/{len(DEFAULT_UNIVERSE)} "
+            f"assets succeeded; need ≥ {n_required}. NOT writing summary.json "
+            f"so the previous good snapshot stays on main.",
+            file=sys.stderr,
+        )
+        return 1
+
     # summary.json — multi-asset grid + headline stats
     summary = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
