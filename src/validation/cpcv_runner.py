@@ -59,6 +59,8 @@ from src.validation.deflated_sharpe import (
     deflated_sharpe,
     probability_of_backtest_overfitting,
 )
+from src.validation.cost_model import CostModel
+from src.validation.risk_layer import RiskControls
 
 
 # A strategy is any callable that accepts (features_train, features_test)
@@ -222,6 +224,9 @@ def run_cpcv_validation(
     seed: int = 42,
     ann_factor: int = ANN_FACTOR_DAILY,
     cost_bps: float = COST_BPS_DEFAULT,
+    cost_model: Optional[CostModel] = None,
+    risk_controls: Optional[RiskControls] = None,
+    volume_series: Optional[pd.Series] = None,
 ) -> ValidationReport:
     """Run a single strategy through CPCV and return its ValidationReport.
 
@@ -253,9 +258,19 @@ def run_cpcv_validation(
         Annualisation factor (252 for daily).
     cost_bps : float
         One-way transaction cost in basis points, applied to |Δposition|
-        per bar. Default 2 bps (see ``COST_BPS_DEFAULT``). All downstream
-        metrics (Sharpe, Sortino, max-DD, Calmar, DSR) are net-of-cost.
-        Set ``cost_bps=0`` to recover the frictionless backtest.
+        per bar. Default 2 bps (see ``COST_BPS_DEFAULT``). Ignored when
+        *cost_model* is supplied. Set ``cost_bps=0`` to recover the
+        frictionless backtest.
+    cost_model : CostModel, optional
+        Asset-specific + volume-adjusted cost model. When provided,
+        overrides *cost_bps*. Use ``CostModel(ticker="SPY")`` for a
+        real-cost SPY backtest.
+    risk_controls : RiskControls, optional
+        Drawdown circuit-breaker and VaR gate. When provided, positions
+        are filtered before the cost and return calculation.
+    volume_series : pd.Series, optional
+        Daily traded volume aligned with *features_df*. Forwarded to
+        ``cost_model.compute_tc()`` for the Amihud adjustment.
 
     Returns
     -------
@@ -300,14 +315,28 @@ def run_cpcv_validation(
                 f"{len(test_idx)} test bars on path {path_id}"
             )
 
+        # Risk controls (DD circuit-breaker + VaR gate) — applied before cost
+        # so cost is computed on the risk-adjusted positions.
+        if risk_controls is not None:
+            r_train_arr = returns_series.iloc[train_idx].to_numpy()
+            positions = risk_controls.apply_risk_controls(
+                positions, bar_returns, init_returns=r_train_arr
+            )
+
         gross_returns = positions * bar_returns
-        # Transaction cost: cost_bps × |Δposition| per bar. prepend=0 charges
-        # the cost of entering the very first position on the path.
-        if cost_bps > 0:
+
+        # Transaction cost: real model (CostModel) if provided, else flat bps.
+        if cost_model is not None:
+            vol_t = (
+                volume_series.iloc[test_idx].to_numpy()
+                if volume_series is not None else None
+            )
+            tc = cost_model.compute_tc(positions, volume=vol_t)
+        elif cost_bps > 0:
             tc = (cost_bps / 1e4) * np.abs(np.diff(positions, prepend=0.0))
-            strategy_returns = gross_returns - tc
         else:
-            strategy_returns = gross_returns
+            tc = 0.0
+        strategy_returns = gross_returns - tc
         oos_returns[path_id] = pd.Series(
             strategy_returns,
             index=features_df.index[test_idx],
@@ -382,6 +411,9 @@ def run_cpcv_multi_strategy(
     seed: int = 42,
     ann_factor: int = ANN_FACTOR_DAILY,
     cost_bps: float = COST_BPS_DEFAULT,
+    cost_model: Optional[CostModel] = None,
+    risk_controls: Optional[RiskControls] = None,
+    volume_series: Optional[pd.Series] = None,
 ) -> Dict[str, ValidationReport]:
     """Run N strategies through the SAME CPCV folds → PBO is well-defined.
 
@@ -433,17 +465,41 @@ def run_cpcv_multi_strategy(
             # Apply cost on IS too so the IS Sharpe (feeds PBO) is consistent
             # with the OOS Sharpe — otherwise PBO inflates artificially.
             is_positions = np.asarray(fn(f_train, f_train), dtype=float)
-            is_returns = is_positions * r_train
-            if cost_bps > 0:
+            if risk_controls is not None:
+                is_positions = risk_controls.apply_risk_controls(
+                    is_positions, r_train
+                )
+            is_gross = is_positions * r_train
+            if cost_model is not None:
+                vol_is = (
+                    volume_series.iloc[train_idx].to_numpy()
+                    if volume_series is not None else None
+                )
+                is_tc = cost_model.compute_tc(is_positions, volume=vol_is)
+            elif cost_bps > 0:
                 is_tc = (cost_bps / 1e4) * np.abs(np.diff(is_positions, prepend=0.0))
-                is_returns = is_returns - is_tc
+            else:
+                is_tc = 0.0
+            is_returns = is_gross - is_tc
             is_sharpes[path_id, s_idx] = annualised_sharpe(is_returns, ann_factor)
 
             oos_positions = np.asarray(fn(f_train, f_test), dtype=float)
-            oos_returns_arr = oos_positions * r_test
-            if cost_bps > 0:
+            if risk_controls is not None:
+                oos_positions = risk_controls.apply_risk_controls(
+                    oos_positions, r_test, init_returns=r_train
+                )
+            oos_gross = oos_positions * r_test
+            if cost_model is not None:
+                vol_oos = (
+                    volume_series.iloc[test_idx].to_numpy()
+                    if volume_series is not None else None
+                )
+                oos_tc = cost_model.compute_tc(oos_positions, volume=vol_oos)
+            elif cost_bps > 0:
                 oos_tc = (cost_bps / 1e4) * np.abs(np.diff(oos_positions, prepend=0.0))
-                oos_returns_arr = oos_returns_arr - oos_tc
+            else:
+                oos_tc = 0.0
+            oos_returns_arr = oos_gross - oos_tc
             oos_sharpes[path_id, s_idx] = annualised_sharpe(oos_returns_arr, ann_factor)
 
             per_strategy_oos[name][path_id] = pd.Series(

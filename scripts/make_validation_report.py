@@ -64,10 +64,12 @@ from src.strategies.benchmarks import (  # noqa: E402
     flat,
     momentum_20d,
 )
+from src.validation.cost_model import CostModel  # noqa: E402
 from src.validation.cpcv_runner import (  # noqa: E402
     emit_markdown_report,
     run_cpcv_multi_strategy,
 )
+from src.validation.risk_layer import RiskControls  # noqa: E402
 from src.validation.multi_asset import (  # noqa: E402
     DEFAULT_UNIVERSE,
     evaluate_multi_asset,
@@ -118,6 +120,20 @@ def main() -> int:
     print(f"      {len(features)} bars, "
           f"{features.index[0].date()} → {features.index[-1].date()}, "
           f"{features.shape[1] - 1} features (v2)")
+
+    # Fetch daily volume for Amihud cost scaling. Volume is stored in the
+    # same yfinance download as close; use a direct download to get the
+    # "Volume" column and align it to features.index.
+    try:
+        import yfinance as yf  # noqa: PLC0415
+        _raw = yf.download("SPY", start=START, end=END, progress=False, auto_adjust=True)
+        _vol_col = "Volume" if "Volume" in _raw.columns else _raw.columns[_raw.columns.str.lower() == "volume"][0]
+        spy_volume = _raw[_vol_col].reindex(features.index)
+        print(f"      volume: {spy_volume.notna().sum()} bars  "
+              f"median={spy_volume.median()/1e6:.1f}M shares/day")
+    except Exception as exc:
+        spy_volume = None
+        print(f"      ⚠️  volume fetch failed ({exc}); falling back to flat cost")
 
     print("[2/6] Computing triple-barrier labels (π=2.0, h=10) for context ...",
           flush=True)
@@ -248,6 +264,13 @@ def main() -> int:
         "patchtst": patchtst,                      # Brief 4.1
         "conformal_xgb": conformal_xgb,            # Brief 4.2
     }
+    # Real cost model (SPY-specific bps + Amihud volume adjustment) and
+    # portfolio risk controls (15% DD circuit-breaker + 95% VaR ≤ 2% NAV).
+    cost_model = CostModel(ticker="SPY")
+    risk_controls = RiskControls(dd_limit=0.15, dd_reentry=0.075, var_nav_pct=0.02)
+    print(f"      cost model: SPY base={cost_model.base_bps()} bps + Amihud  |  "
+          f"risk: DD≤{risk_controls.dd_limit:.0%}, VaR≤{risk_controls.var_nav_pct:.0%}")
+
     reports = run_cpcv_multi_strategy(
         strategies=strategies,
         features_df=features,
@@ -261,6 +284,9 @@ def main() -> int:
         # — never adjust it inline here.
         n_trials=N_TRIALS_REGISTERED,
         seed=42,
+        cost_model=cost_model,
+        risk_controls=risk_controls,
+        volume_series=spy_volume,
     )
 
     print("[4/6] SPY aggregate Sharpe percentiles:")

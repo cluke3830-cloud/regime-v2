@@ -99,16 +99,60 @@ honest input to the Bailey-López de Prado deflation. Pass bar at α=0.05:
 | `patchtst` (Transformer deep ensemble, 2 seeds) | +0.737 | 0.037 | -2.9% | beats some, doesn't clear bar |
 | `conformal_xgb` (xgb_v2 + Gibbs-Candès calibration) | +0.163 | 0.005 | -8.1% | calibration ≠ alpha |
 
-**No strategy clears DSR p ≥ 0.95 on SPY alone** under a single median-path of
-~290 bars deflated against 200 trials. This is what the honest stats look
-like after un-inflating the pseudo-replicated DSR — and exactly why the
-rigour story below has to come from breadth, not point estimates.
+With n_trials=200 and T≈450 test bars per CPCV path, the DSR deflation bar sits at ~2.1 annualized Sharpe — a hurdle no single strategy clears. Our primary statistical claim is the multi-asset robustness gate: 9 of 10 assets show positive OOS Sharpe with mean +0.544.
 
 **Soft gate:** Multi-asset robustness on `ms_garch` across 10 tickers — **9/10 positive OOS Sharpe (90%), mean +0.544** ✅. Best assets: SPY +1.025, QQQ +0.958, DIA +0.937 (US large-caps remain the most regime-tractable). Crypto holds up too: BTC-USD +0.930. Worst: TLT -0.082 (the lone OOS-negative; 20Y Treasuries' single-regime drift makes vol-conditional sizing unhelpful).
 
 **PBO: 71.11%** ⚠️ — the population-level overfitting probability tripped under cost. Before the 2 bps charge, PBO sat at 13.3% and TVTP-MSAR led at +2.46 Sharpe; after, the high-turnover models concentrated at the bottom of the ranking and MS-GARCH took the crown. The honest read: **with realistic costs, the strategy population is dominated by low-turnover vol/regime models**, and the IS/OOS rank consistency that PBO measures degrades. The multi-asset soft gate (90% positive across 10 universes) is what carries the rigor story here — model selection on SPY alone is no longer the trustworthy axis.
 
 **Why MS-GARCH wins under cost:** the GARCH(1,1) vol forecast turns over only at the persistence horizon of the volatility process (weeks, not days), so the 2 bps × |Δposition| drag is roughly an order of magnitude smaller than for the Hamilton-AR or XGBoost strategies that re-position every bar. Its position mapping (vol-scaled long, no shorting) sidesteps the symmetric-cost problem that hurts the long/short variants.
+
+## Production Data Pipeline
+
+Live regime state is updated daily at **16:15 ET** by `scripts/update_live_regime.py`
+running on EC2, sourcing from IB Gateway (port 4004) — no yfinance dependency
+in the live path. FRED macro data (T10Y2Y, BAA10Y) is fetched directly from
+the FRED API; IBKR covers all price series (VIX, VIX3M, TLT, GLD, per-asset
+closes). The 70% coverage gate prevents committing a degraded snapshot.
+
+```
+Market close (16:00 ET)
+  │
+  └─ systemd timer (16:15 ET)
+       └─ update_live_regime.py
+            ├─ IbkrDailyClient.fetch_daily_close() × 14 contracts
+            ├─ fetch_fred_series() × 2 (T10Y2Y, BAA10Y)
+            ├─ compute_features_v2() → GMM-HMM + rule-baseline
+            ├─ write dashboard/public/data/regimes/*.json
+            └─ git commit + push → Vercel rebuild
+```
+
+### Real cost model (v2)
+
+Replaces the flat 2 bps default with an asset-specific table scaled by
+Amihud illiquidity (±50%, clamped to [0.5×, 3×] base):
+
+| Asset class | Base spread (one-way) | Volume adjustment |
+|-------------|----------------------|-------------------|
+| Large-cap US ETF (SPY, QQQ) | 0.5 bps | ±50% Amihud |
+| Mid-cap US ETF (DIA, IWM) | 0.75–1.0 bps | ±50% Amihud |
+| International / EM ETF (EFA, EEM) | 1.5–2.0 bps | ±50% Amihud |
+| Fixed income / Gold (GLD, TLT) | 1.0 bps | ±50% Amihud |
+| Crypto (BTC-USD) | 10.0 bps | ±50% Amihud |
+| FX (JPY=X) | 0.5 bps | ±50% Amihud |
+
+Source: `src/validation/cost_model.py:ASSET_COST_BPS`.
+
+### Portfolio risk controls
+
+Applied per CPCV path (causal — no lookahead) and enforced in the live classifier:
+
+- **Drawdown circuit-breaker**: position zeroed when rolling equity drawdown
+  exceeds **15%**; re-enters when drawdown recovers to **< 7.5%**.
+- **VaR gate**: positions scaled so 95th-percentile 1-day historical VaR
+  (60-bar rolling window) ≤ **2% of NAV**. Scaling only reduces — never levers up.
+
+Source: `src/validation/risk_layer.py:RiskControls`.
 
 ## 3-regime taxonomy
 

@@ -304,36 +304,72 @@ def _empirical_transition_matrix(labels: np.ndarray, n_states: int) -> List[List
     return [[round(float(v), 4) for v in row] for row in probs]
 
 
-def main(out_dir: Optional[Path] = None) -> int:
+def main(out_dir: Optional[Path] = None, backend: str = "yfinance") -> int:
+    """Build dashboard JSON files.
+
+    Parameters
+    ----------
+    out_dir : Path, optional
+        Output directory (default: ``dashboard/public/data``).
+    backend : str
+        ``"yfinance"`` (default) — use cached yfinance data.
+        ``"ibkr"``    — fetch live daily bars from IB Gateway (port 4004).
+                        Requires ib_insync + a running IBKR Gateway.
+    """
+    import argparse as _ap
+    _parser = _ap.ArgumentParser(add_help=False)
+    _parser.add_argument("--backend", choices=["yfinance", "ibkr"], default=backend)
+    _parser.add_argument("--out-dir", default=None)
+    _args, _ = _parser.parse_known_args()
+    backend = _args.backend
+    if _args.out_dir is not None:
+        out_dir = Path(_args.out_dir)
+
     if out_dir is None:
         out_dir = ROOT / "dashboard" / "public" / "data"
     regimes_dir = out_dir / "regimes"
     regimes_dir.mkdir(parents=True, exist_ok=True)
 
-    cache_dir = ROOT / "data" / "cache"
-    start = "2015-01-01"
-    # yfinance treats `end` as exclusive — push it 1 day past today so we
-    # capture today's bar once it settles after market close.
-    end = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
-    # GHA runs in a fresh container with no cache; locally each day creates
-    # a new parquet under `data/cache/`. Set REGIME_V2_NO_CACHE=1 to force
-    # a re-fetch instead of relying on yesterday's cached file.
-    if os.environ.get("REGIME_V2_NO_CACHE") == "1":
-        cache_dir = None
-    print(f"[snapshot] window: {start} → {end} (cache={'on' if cache_dir else 'off'})")
-
-    print(f"[snapshot] fetching aux bundle (VIX, VIX3M, TLT, GLD, FRED)...")
-    aux_bundle = fetch_aux_data_bundle(
-        start, end,
-        cache_dir=cache_dir,
-        fred_api_key=os.environ.get("FRED_API_KEY"),
-    )
+    if backend == "ibkr":
+        from src.features.ibkr_daily import (  # noqa: PLC0415
+            fetch_ibkr_aux_bundle,
+            fetch_ibkr_daily,
+        )
+        _n_bars = 504  # ~2 years of daily bars from IBKR
+        print(f"[snapshot] backend=ibkr  n_bars={_n_bars}")
+        print("[snapshot] fetching aux bundle from IBKR + FRED...")
+        aux_bundle = fetch_ibkr_aux_bundle(
+            n_bars=_n_bars,
+            fred_api_key=os.environ.get("FRED_API_KEY"),
+        )
+    else:
+        cache_dir = ROOT / "data" / "cache"
+        start = "2015-01-01"
+        # yfinance treats `end` as exclusive — push it 1 day past today so we
+        # capture today's bar once it settles after market close.
+        end = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+        # GHA runs in a fresh container with no cache; locally each day creates
+        # a new parquet under `data/cache/`. Set REGIME_V2_NO_CACHE=1 to force
+        # a re-fetch instead of relying on yesterday's cached file.
+        if os.environ.get("REGIME_V2_NO_CACHE") == "1":
+            cache_dir = None
+        print(f"[snapshot] backend=yfinance  window: {start} → {end}  "
+              f"cache={'on' if cache_dir else 'off'}")
+        print("[snapshot] fetching aux bundle (VIX, VIX3M, TLT, GLD, FRED)...")
+        aux_bundle = fetch_aux_data_bundle(
+            start, end,
+            cache_dir=cache_dir,
+            fred_api_key=os.environ.get("FRED_API_KEY"),
+        )
 
     summary_assets: List[Dict[str, Any]] = []
     for i, ticker in enumerate(DEFAULT_UNIVERSE, 1):
         print(f"[snapshot] [{i:>2}/{len(DEFAULT_UNIVERSE)}] {ticker}...", flush=True)
         try:
-            close = load_close(ticker, start, end, cache_dir=cache_dir)
+            if backend == "ibkr":
+                close = fetch_ibkr_daily(ticker, n_bars=_n_bars)  # type: ignore[possibly-undefined]
+            else:
+                close = load_close(ticker, start, end, cache_dir=cache_dir)  # type: ignore[possibly-undefined]
         except Exception as exc:
             print(f"  ! load failed: {exc}")
             continue
