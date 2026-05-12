@@ -11,6 +11,8 @@ statsmodels>=0.14   # TVTP-MSAR / MS-AR (src/baselines/tvtp_msar.py)
 pyarrow>=14   # parquet engine for the data/cache directory
 yfinance>=0.2.40
 requests>=2.31
+fredapi>=0.5          # FRED macro data (T10Y2Y, BAA10Y)
+ib_insync>=0.9.86     # IBKR live data (src/features/ibkr_daily.py)
 
 # Dev
 pytest>=8.0
