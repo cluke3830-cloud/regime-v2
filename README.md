@@ -74,23 +74,35 @@ that look great on paper but burn the edge on commissions and spread. The
 audit-grade trial count lives in [`src/validation/strategy_registry.py`](src/validation/strategy_registry.py)
 (15 named strategies + 10 multi-asset universes + 36-combo HPO grid → `N_TRIALS_REGISTERED = 200`).
 
-| Strategy | Sharpe p50 | DSR Sharpe | Max-DD p50 | Verdict |
+DSR is computed on the **median-Sharpe CPCV path's** OOS returns — not on the
+concatenation of all 45 paths. Concatenation pseudo-replicates bars (each bar
+appears in up to 9 paths), inflating effective T ~9× and saturating the
+z-score at p=1.0000. Median-path is an iid-valid single sample and the only
+honest input to the Bailey-López de Prado deflation. Pass bar at α=0.05:
+**DSR p-value ≥ 0.95**.
+
+| Strategy | Sharpe p50 | DSR p-value | Max-DD p50 | Verdict |
 |---|---:|---:|---:|---|
 | `flat` | 0.000 | — | 0.000 | reference |
-| `buy_and_hold` | +0.806 | +0.761 | -19.2% | bull-market baseline |
-| `momentum_20d` | +0.914 | +0.949 | -8.5% | simple-MA gold standard |
-| `rule_baseline` (3-regime, hand-tuned) | +0.881 | +0.843 | -10.5% | matches momentum after cost |
-| `xgb_v1` (21 feat, audit defaults) | +0.065 | +0.075 | -11.0% | turnover-heavy, cost eats edge |
-| `xgb_v2` (21 feat, reg-heavy) | +0.175 | +0.110 | -7.6% | better than v1, still cost-sensitive |
-| `xgb_tuned` (nested CPCV grid) | +0.120 | +0.085 | -7.9% | tuner can't overcome cost |
-| `meta_equal` (rule + momentum + B&H, equal blend) | +1.004 | +1.066 | -9.4% | runner-up |
-| `meta_ridge` (rule + momentum + B&H, Ridge-weighted) | +0.844 | +0.791 | -1.0% | low DD, modest edge |
-| `transition_gated` (rule × `(1 - P(transition))`) | +0.807 | +0.811 | -9.4% | gate ≈ neutral |
-| `tvtp_msar` (Hamilton 2-state MS-AR + vol-regime sizing) | +0.717 | +0.712 | -8.4% | high turnover penalty |
-| `hsmm` (4-state Gaussian HMM + Weibull durations) | +0.135 | +0.259 | -9.3% | diversifier |
-| **`ms_garch`** (GARCH(1,1) vol-conditional sizing) | **+1.025** | **+0.973** | **-11.3%** | **🏆 Champion** |
-| `patchtst` (Transformer deep ensemble, 2 seeds) | +0.737 | +0.097 | -2.9% | DSR flags as overfit |
-| `conformal_xgb` (xgb_v2 + Gibbs-Candès calibration) | +0.163 | +0.079 | -8.1% | calibration ≠ alpha |
+| `buy_and_hold` | +0.806 | 0.045 | -19.2% | bull-market baseline; deep DD |
+| `momentum_20d` | +0.914 | 0.058 | -8.5% | simple-MA gold standard |
+| `rule_baseline` (3-regime, hand-tuned) | +0.881 | 0.054 | -10.5% | matches momentum after cost |
+| `xgb_v1` (21 feat, audit defaults) | +0.065 | 0.004 | -11.0% | turnover-heavy, cost eats edge |
+| `xgb_v2` (21 feat, reg-heavy) | +0.175 | 0.006 | -7.6% | better than v1, still cost-sensitive |
+| `xgb_tuned` (nested CPCV grid) | +0.120 | 0.005 | -7.9% | tuner can't overcome cost |
+| `meta_equal` (rule + momentum + B&H, equal blend) | +1.004 | 0.067 | -9.4% | runner-up |
+| `meta_ridge` (rule + momentum + B&H, Ridge-weighted) | +0.844 | 0.047 | -1.0% | low DD, modest edge |
+| `transition_gated` (rule × `(1 - P(transition))`) | +0.807 | 0.046 | -9.4% | gate ≈ neutral |
+| `tvtp_msar` (Hamilton 2-state MS-AR + vol-regime sizing) | +0.717 | 0.034 | -8.4% | high turnover penalty |
+| `hsmm` (4-state Gaussian HMM + Weibull durations) | +0.135 | 0.005 | -9.3% | diversifier |
+| **`ms_garch`** (GARCH(1,1) vol-conditional sizing) | **+1.025** | **0.078** | **-11.3%** | **🏆 Champion** |
+| `patchtst` (Transformer deep ensemble, 2 seeds) | +0.737 | 0.037 | -2.9% | beats some, doesn't clear bar |
+| `conformal_xgb` (xgb_v2 + Gibbs-Candès calibration) | +0.163 | 0.005 | -8.1% | calibration ≠ alpha |
+
+**No strategy clears DSR p ≥ 0.95 on SPY alone** under a single median-path of
+~290 bars deflated against 200 trials. This is what the honest stats look
+like after un-inflating the pseudo-replicated DSR — and exactly why the
+rigour story below has to come from breadth, not point estimates.
 
 **Soft gate:** Multi-asset robustness on `ms_garch` across 10 tickers — **9/10 positive OOS Sharpe (90%), mean +0.544** ✅. Best assets: SPY +1.025, QQQ +0.958, DIA +0.937 (US large-caps remain the most regime-tractable). Crypto holds up too: BTC-USD +0.930. Worst: TLT -0.082 (the lone OOS-negative; 20Y Treasuries' single-regime drift makes vol-conditional sizing unhelpful).
 
