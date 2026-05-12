@@ -41,8 +41,9 @@ STATE_COLORS = {0: "#22c55e", 1: "#a3a3a3", 2: "#ef4444"}
 def _build_features(close: pd.Series, vol_halflife: int = 20) -> pd.DataFrame:
     """Build a tiny 2-feature frame: log return + EWMA vol.
 
-    Causal: vol is EWMA-of-past-squared-returns, no shift needed (already
-    one-bar-lagged by construction).
+    Vol is EWMA-of-past-squared-returns (causal by construction). The log
+    return at bar t is the contemporaneous return — callers must shift
+    output positions by one bar before trading to avoid lookahead.
     """
     r = np.log(close).diff()
     sq = r.pow(2)

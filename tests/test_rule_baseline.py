@@ -1,14 +1,14 @@
 """Tests for src.regime.rule_baseline (Brief 2.2).
 
-Tests for the 5-regime rule classifier:
-  - Schema: output has p_0..p_4 columns summing to 1, label in {0..4},
+Tests for the 3-regime rule classifier:
+  - Schema: output has p_0..p_2 columns summing to 1, label in {0..2},
     regime is human-readable string, position matches REGIME_ALLOC.
   - Causal hygiene: perturb future feature rows, regime at earlier
     indices is unchanged.
   - Stabilizer hysteresis works (no rapid flipping on noisy inputs).
   - Crisis promote gate fires on raw shock or raw DD thresholds.
-  - Full Bull regime favoured on synthetic strong-uptrend data.
-  - Full Bear regime favoured on synthetic crash data.
+  - Bull regime favoured on synthetic strong-uptrend data.
+  - Bear regime favoured on synthetic crash data.
   - Strategy adapter is reproducible (same inputs → same positions).
   - Works inside the CPCV harness without crashing.
 """
@@ -85,7 +85,7 @@ def _crash_series(n: int = 800, seed: int = 0) -> pd.Series:
 def test_weight_matrix_shape():
     assert _DEFAULT_WEIGHTS.shape == (N_REGIMES, 21)
     assert len(V2_FEATURE_ORDER) == 21
-    assert len(REGIME_NAMES) == N_REGIMES == 5
+    assert len(REGIME_NAMES) == N_REGIMES == 3
     assert len(REGIME_ALLOC) == N_REGIMES
 
 
@@ -104,13 +104,13 @@ def test_sequence_output_schema():
     close = _gbm(n=600)
     features = compute_features_v2(close)
     out = compute_rule_regime_sequence(features)
-    assert {"p_0", "p_1", "p_2", "p_3", "p_4", "label", "regime", "position"}.issubset(
+    assert {"p_0", "p_1", "p_2", "label", "regime", "position"}.issubset(
         out.columns
     )
     np.testing.assert_allclose(
-        out[["p_0", "p_1", "p_2", "p_3", "p_4"]].sum(axis=1), 1.0, atol=1e-9
+        out[["p_0", "p_1", "p_2"]].sum(axis=1), 1.0, atol=1e-9
     )
-    assert set(out["label"].unique()).issubset({0, 1, 2, 3, 4})
+    assert set(out["label"].unique()).issubset({0, 1, 2})
     assert set(out["regime"].unique()).issubset(set(REGIME_NAMES.values()))
     # position must match REGIME_ALLOC[label] for every row
     expected_pos = out["label"].map(REGIME_ALLOC).astype(float)
@@ -144,7 +144,7 @@ def test_causal_no_lookahead():
         # Add some noise to the constant scramble
         mutated.iloc[pos + 1:] *= rng.uniform(0.5, 1.5, size=mutated.shape)[pos + 1:]
         recomputed = compute_rule_regime_sequence(mutated)
-        for col in ("p_0", "p_1", "p_2", "p_3", "p_4", "label"):
+        for col in ("p_0", "p_1", "p_2", "label"):
             assert recomputed.loc[ts, col] == baseline.loc[ts, col], (
                 f"{col} at {ts} (pos {pos}) changed under future mutation"
             )
@@ -156,31 +156,29 @@ def test_causal_no_lookahead():
 
 
 def test_crisis_promote_on_extreme_shock():
-    """riskoff_confirm forces Full Bear when raw shock_z exceeds 3.5σ
+    """riskoff_confirm forces Bear when raw shock_z exceeds 3.5σ
     even if argmax picked a different regime.
     """
-    probs = np.array([0.5, 0.2, 0.15, 0.10, 0.05])  # argmax = 0 (Full Bull)
+    probs = np.array([0.60, 0.25, 0.15])  # argmax = 0 (Bull)
     label = int(np.argmax(probs))  # 0
     promoted = _riskoff_confirm(label, probs, shock_raw=4.0, dd_raw=0.05)
-    assert promoted == 4, "expected Full Bear promotion on 4σ shock"
+    assert promoted == 2, "expected Bear promotion on 4σ shock"
 
 
 def test_crisis_promote_on_deep_drawdown():
-    probs = np.array([0.50, 0.30, 0.10, 0.07, 0.03])
+    probs = np.array([0.60, 0.30, 0.10])
     label = int(np.argmax(probs))
     promoted = _riskoff_confirm(label, probs, shock_raw=1.0, dd_raw=0.18)
-    assert promoted == 4, "expected Full Bear promotion on 18% DD"
+    assert promoted == 2, "expected Bear promotion on 18% DD"
 
 
 def test_crisis_demote_when_unconfirmed():
-    """If argmax is Full Bear but shock and DD are mild, demote to
-    second-best regime.
-    """
-    probs = np.array([0.20, 0.20, 0.15, 0.15, 0.30])  # argmax = 4
-    label = 4
+    """If argmax is Bear but shock and DD are mild, demote to second-best regime."""
+    probs = np.array([0.25, 0.20, 0.55])  # argmax = 2 (Bear)
+    label = 2  # Bear (FULL_BEAR)
     demoted = _riskoff_confirm(label, probs, shock_raw=0.5, dd_raw=0.01)
-    assert demoted != 4
-    assert demoted == 0  # second-best is Full Bull (also 0.20, but earlier idx)
+    assert demoted != 2
+    assert demoted == 0  # second-best non-Bear is Bull
 
 
 # ---------------------------------------------------------------------------
@@ -198,8 +196,8 @@ def test_strong_uptrend_favours_bull_regimes():
     close = _gbm(n=1000, drift=0.0015, vol=0.005, seed=42)
     features = compute_features_v2(close)
     out = compute_rule_regime_sequence(features)
-    bull_share = (out["label"].isin([0, 1])).mean()
-    bear_share = (out["label"].isin([3, 4])).mean()
+    bull_share = (out["label"] == 0).mean()
+    bear_share = (out["label"] == 2).mean()
     assert bull_share > bear_share, (
         f"strong uptrend should favour bull regimes: bull={bull_share:.2%}, "
         f"bear={bear_share:.2%}"
@@ -219,9 +217,9 @@ def test_crash_triggers_bear_regime():
     out = compute_rule_regime_sequence(features)
     # During the crash window (bars ~400-450), bear regimes should fire
     crash_window = out.iloc[400:480]
-    bear_in_crash = (crash_window["label"].isin([3, 4])).any()
+    bear_in_crash = (crash_window["label"] == 2).any()
     assert bear_in_crash, (
-        f"expected bear regime during synthetic crash; "
+        f"expected Bear regime during synthetic crash; "
         f"label distribution in window: "
         f"{crash_window['label'].value_counts().to_dict()}"
     )

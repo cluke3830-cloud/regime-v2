@@ -256,9 +256,9 @@ def make_transition_gated_strategy(
         # Step 1: rule sequence on train
         train_seq = compute_rule_regime_sequence(features_train)
         train_labels = train_seq["label"].to_numpy(dtype=np.int64)
-        # Detector input features = v2 cols + 5 regime probs
+        # Detector input features = v2 cols + 3 regime probs
         feat_cols = [c for c in V2_FEATURE_ORDER if c in features_train.columns]
-        prob_cols = [f"p_{r}" for r in range(5)]
+        prob_cols = [f"p_{r}" for r in range(3)]
         X_train = np.column_stack([
             features_train[feat_cols].to_numpy(dtype=float),
             train_seq[prob_cols].to_numpy(dtype=float),

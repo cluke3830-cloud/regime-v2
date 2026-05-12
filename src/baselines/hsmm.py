@@ -61,6 +61,14 @@ DEFAULT_K3_POSITIONS: Dict[int, float] = {
     2: -0.50,   # highest-variance: Bear
 }
 
+# Default 4-state position mapping: Full Bull / Half Bull / Half Bear / Full Bear
+DEFAULT_K4_POSITIONS: Dict[int, float] = {
+    0:  1.00,   # lowest-variance: Full Bull
+    1:  0.50,   # Half Bull
+    2: -0.25,   # Half Bear
+    3: -0.50,   # highest-variance: Full Bear
+}
+
 
 # ---------------------------------------------------------------------------
 # DurationAwareHMM
@@ -72,7 +80,7 @@ class DurationAwareHMM:
 
     Parameters
     ----------
-    k_states : int, default=4
+    k_states : int, default=3
         Number of hidden states.
     covariance_type : str, default="diag"
         Covariance shape for Gaussian emissions. ``"diag"`` is the
@@ -250,9 +258,11 @@ class DurationAwareHMM:
             log_trans = np.log(np.maximum(self.hmm_.transmat_, 1e-300))
             log_start = np.log(np.maximum(self.hmm_.startprob_, 1e-300))
 
+            log_uniform = np.full(self.k_states, -np.log(self.k_states))
             alphas = np.zeros((n, self.k_states))
             log_alpha = log_start + log_emit[0]
-            log_alpha -= np.logaddexp.reduce(log_alpha)
+            lse = np.logaddexp.reduce(log_alpha)
+            log_alpha = log_alpha - lse if np.isfinite(lse) else log_uniform.copy()
             alphas[0] = np.exp(log_alpha)
 
             for t in range(1, n):
@@ -261,7 +271,8 @@ class DurationAwareHMM:
                     log_alpha_prev[:, None] + log_trans, axis=0
                 )
                 log_alpha = log_pred + log_emit[t]
-                log_alpha -= np.logaddexp.reduce(log_alpha)
+                lse = np.logaddexp.reduce(log_alpha)
+                log_alpha = log_alpha - lse if np.isfinite(lse) else log_uniform.copy()
                 alphas[t] = np.exp(log_alpha)
 
             return alphas
@@ -404,5 +415,6 @@ def make_hsmm_strategy(
 __all__ = [
     "DurationAwareHMM",
     "DEFAULT_K3_POSITIONS",
+    "DEFAULT_K4_POSITIONS",
     "make_hsmm_strategy",
 ]

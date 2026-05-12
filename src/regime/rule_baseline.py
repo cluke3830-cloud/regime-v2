@@ -393,14 +393,24 @@ def compute_rule_regime_sequence(features_v2: pd.DataFrame) -> pd.DataFrame:
     prev_vol: Optional[float] = None
     stab = Stabilizer()
 
-    # Pure-market-state classification: label = stabilized softmax argmax.
-    # The _riskoff_confirm gate (drawdown > 15% OR shock > 3.5σ → force Full Bear)
-    # was removed — we want the model's view of the market, not a rule override.
+    # Pre-extract raw (un-normed) shock and drawdown for _riskoff_confirm.
+    # shock_z is a signed z-score; abs() catches extreme negative shocks (crashes).
+    # drawdown_252 is in [-1, 0]; abs() gives the fractional loss from the peak.
+    shock_raw_arr = (
+        features_v2["shock_z"].fillna(0.0).abs().to_numpy()
+        if "shock_z" in features_v2.columns else np.zeros(n)
+    )
+    dd_raw_arr = (
+        features_v2["drawdown_252"].fillna(0.0).abs().to_numpy()
+        if "drawdown_252" in features_v2.columns else np.zeros(n)
+    )
+
     for t in range(n):
         sc = _row_score(inputs[t])
         sc = _risk_condition(sc, stab.current, stab.persist, vol_n[t], prev_vol)
         probs = _softmax(sc)
         raw_label = int(np.argmax(probs))
+        raw_label = _riskoff_confirm(raw_label, probs, shock_raw_arr[t], dd_raw_arr[t])
         stable = stab.step(raw_label, probs)
         probs_out[t] = probs
         labels_out[t] = stable
