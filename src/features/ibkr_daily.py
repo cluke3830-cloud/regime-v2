@@ -108,6 +108,15 @@ class IbkrDailyClient:
                 pass
             self._ib = None
 
+    @staticmethod
+    def _duration_str(n_bars: int) -> str:
+        # IBKR counts "N D" as calendar days. 300 trading bars ≈ 420 calendar
+        # days, which exceeds the 365-day limit (error 321). Use year units
+        # whenever n_bars is large enough to risk that overflow.
+        if n_bars <= 252:
+            return f"{n_bars} D"
+        return f"{max(1, round(n_bars / 252))} Y"
+
     def fetch_daily_close(self, ticker: str, n_bars: int = 300) -> pd.Series:
         """Fetch *n_bars* of daily close prices for *ticker*.
 
@@ -120,7 +129,7 @@ class IbkrDailyClient:
         bars = self._ib.reqHistoricalData(
             contract,
             endDateTime="",
-            durationStr=f"{n_bars} D",
+            durationStr=self._duration_str(n_bars),
             barSizeSetting="1 day",
             whatToShow=_what_to_show(ticker),
             useRTH=True,
@@ -150,7 +159,7 @@ class IbkrDailyClient:
         bars = self._ib.reqHistoricalData(
             contract,
             endDateTime="",
-            durationStr=f"{n_bars} D",
+            durationStr=self._duration_str(n_bars),
             barSizeSetting="1 day",
             whatToShow=_what_to_show(ticker),
             useRTH=True,
