@@ -2,11 +2,6 @@ import { loadAssetIndex, loadSummary } from "@/lib/data";
 import TopBar from "@/components/TopBar";
 import AssetGrid from "@/components/AssetGrid";
 
-function fmtPct(s: number | null | undefined): string {
-  if (s === null || s === undefined || Number.isNaN(s)) return "—";
-  return (s * 100).toFixed(1) + "%";
-}
-
 export default async function HomePage() {
   const [index, summary] = await Promise.all([loadAssetIndex(), loadSummary()]);
 
@@ -16,10 +11,6 @@ export default async function HomePage() {
   const meanSharpe =
     summary.assets.reduce((s, a) => s + (a.sharpe_p50 ?? 0), 0) /
     Math.max(1, summary.assets.length);
-  const regimeCounts: Record<number, number> = {};
-  for (const a of summary.assets) {
-    regimeCounts[a.regime.label] = (regimeCounts[a.regime.label] ?? 0) + 1;
-  }
 
   return (
     <main className="min-h-screen">
@@ -35,7 +26,7 @@ export default async function HomePage() {
               Multi-Asset Regime Universe
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-              10 assets · TVTP-MSAR champion (Hamilton 2-state MS-AR) + 5-regime
+              10 assets · TVTP-MSAR champion (Hamilton 2-state MS-AR) + 3-regime
               rule baseline. Backtest stats are 45-path CPCV OOS Sharpe;
               snapshots refresh daily.
             </p>
@@ -62,20 +53,6 @@ export default async function HomePage() {
         </div>
 
         <AssetGrid assets={summary.assets} />
-
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-5">
-          {[0, 1, 2, 3, 4].map((r) => {
-            const c = regimeCounts[r] ?? 0;
-            return (
-              <RegimeCount
-                key={r}
-                label={r}
-                count={c}
-                total={summary.assets.length}
-              />
-            );
-          })}
-        </div>
 
         <Footer />
       </section>
@@ -118,46 +95,6 @@ function Kpi({
           {hint}
         </div>
       )}
-    </div>
-  );
-}
-
-function RegimeCount({
-  label,
-  count,
-  total,
-}: {
-  label: number;
-  count: number;
-  total: number;
-}) {
-  const REGIME_COLORS = ["#22c55e", "#84cc16", "#a3a3a3", "#f97316", "#ef4444"];
-  const REGIME_NAMES = ["Full Bull", "Half Bull", "Chop", "Half Bear", "Full Bear"];
-  const color = REGIME_COLORS[label];
-  const pct = total > 0 ? count / total : 0;
-  return (
-    <div
-      className="panel relative overflow-hidden p-3"
-      style={{ boxShadow: `inset 0 0 0 1px ${color}33` }}
-    >
-      <div className="font-mono text-[10px] uppercase tracking-wider" style={{ color }}>
-        {REGIME_NAMES[label]}
-      </div>
-      <div className="mt-1 flex items-baseline gap-1">
-        <span className="font-mono text-2xl font-bold" style={{ color }}>
-          {count}
-        </span>
-        <span className="font-mono text-xs text-ink-dim">/ {total}</span>
-      </div>
-      <div className="mt-2 h-1 w-full rounded bg-bg-ring">
-        <div
-          className="h-full rounded transition-all"
-          style={{
-            width: `${pct * 100}%`,
-            backgroundColor: color,
-          }}
-        />
-      </div>
     </div>
   );
 }
