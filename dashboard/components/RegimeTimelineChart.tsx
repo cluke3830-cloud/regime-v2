@@ -79,7 +79,7 @@ export default function RegimeTimelineChart({
             REGIME TIMELINE · ZOOMABLE · LIVE THROUGH {lastBar?.date}
           </div>
           <div className="text-sm text-ink">
-            Rule-baseline 5-regime overlay on normalized close. Drag the brush
+            Rule-baseline 3-regime overlay on normalized close. Drag the brush
             below to zoom.
           </div>
         </div>
@@ -159,7 +159,7 @@ export default function RegimeTimelineChart({
 function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {[0, 1, 2, 3, 4].map((r) => (
+      {[0, 1, 2].map((r) => (
         <span
           key={r}
           className="inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"

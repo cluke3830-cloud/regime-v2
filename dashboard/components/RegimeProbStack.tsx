@@ -28,8 +28,6 @@ export default function RegimeProbStack({
     p0: h.p0,
     p1: h.p1,
     p2: h.p2,
-    p3: h.p3,
-    p4: h.p4,
   }));
   const dates = data.map((d) => d.date);
   const tickInterval = Math.max(1, Math.floor(data.length / 8));
@@ -45,7 +43,7 @@ export default function RegimeProbStack({
             REGIME PROBABILITY STACK
           </div>
           <div className="text-sm text-ink">
-            Posterior P(regime | features) — rule baseline, stacked to 1.0
+            Posterior P(Bull / Neutral / Bear | features) — stacked to 1.0
           </div>
         </div>
         <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider">
@@ -79,7 +77,7 @@ export default function RegimeProbStack({
               formatter={(value: number) => `${(value * 100).toFixed(1)}%`}
             />
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-            {[0, 1, 2, 3, 4].map((r) => (
+            {[0, 1, 2].map((r) => (
               <Area
                 key={r}
                 type="monotone"

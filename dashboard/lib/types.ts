@@ -1,4 +1,4 @@
-export type RegimeLabel = 0 | 1 | 2 | 3 | 4;
+export type RegimeLabel = 0 | 1 | 2;
 
 export interface RegimeMeta {
   label: RegimeLabel;
@@ -24,8 +24,6 @@ export interface HistoryBar {
   p0: number | null;
   p1: number | null;
   p2: number | null;
-  p3: number | null;
-  p4: number | null;
   tvtp_low: number | null;
   tvtp_high: number | null;
   tvtp_pos: number | null;
@@ -79,17 +77,13 @@ export interface AssetIndex {
 }
 
 export const REGIME_COLORS: Record<number, string> = {
-  0: "#22c55e",
-  1: "#84cc16",
-  2: "#a3a3a3",
-  3: "#f97316",
-  4: "#ef4444",
+  0: "#22c55e",  // Bull    — green
+  1: "#a3a3a3",  // Neutral — grey
+  2: "#ef4444",  // Bear    — red
 };
 
 export const REGIME_NAMES: Record<number, string> = {
-  0: "Full Bull",
-  1: "Half Bull",
-  2: "Chop",
-  3: "Half Bear",
-  4: "Full Bear",
+  0: "Bull",
+  1: "Neutral",
+  2: "Bear",
 };

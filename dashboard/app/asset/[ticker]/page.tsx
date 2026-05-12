@@ -157,7 +157,7 @@ export default async function AssetPage({
                         <div className="flex items-center justify-between font-mono text-[11px]">
                           <span className="flex items-center gap-1.5" style={{ color: c }}>
                             <span>
-                              {["Full Bull", "Half Bull", "Chop", "Half Bear", "Full Bear"][i]}
+                              {["Bull", "Neutral", "Bear"][i]}
                             </span>
                             {isActive && (
                               <span

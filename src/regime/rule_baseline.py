@@ -1,72 +1,38 @@
-"""5-regime rule classifier — Regime_v2's own hand-designed baseline.
+"""3-regime rule classifier — Regime_v2's hand-designed baseline.
 
-Brief 2.2 of the regime upgrade plan. This is the comparison strategy the
-XGBoost variants need to beat (audit acceptance gate (a)). Unlike the
-legacy dashboard's 6-regime taxonomy (Calm Trend / Volatile Trend /
-Low-Vol Range / High-Vol Churn / Correction / Crisis), Regime_v2 ships a
-cleaner purely-directional 5-regime view:
+Simplified from the original 5-regime taxonomy. Three regimes provide
+cleaner, more decisive entries — no ambiguous "half" states:
 
-    0  Full Bull   — strong uptrend, low vol, shallow drawdown
-    1  Half Bull   — moderate uptrend or slow grind, contained vol
-    2  Chop        — sideways, no directional edge, mean-reverting
-    3  Half Bear   — moderate downtrend, elevated vol, deeper DD
-    4  Full Bear   — severe stress (the audit's "Crisis" — extreme DD +
-                     shock + credit/VIX spike)
+    0  Bull    — positive momentum, low vol, shallow drawdown
+    1  Neutral — sideways / mean-reverting, no directional edge
+    2  Bear    — negative momentum, high vol, deep drawdown / stress
 
 Each regime has a deterministic position allocation:
 
-    Full Bull   : +1.00   (full long)
-    Half Bull   : +0.70   (long but de-risked)
-    Chop        : +0.20   (light long; chop favours mean-reversion not
-                           directional bets)
-    Half Bear   : -0.20   (light defense)
-    Full Bear   : -0.50   (short, flight to safety)
+    Bull    : +1.00   (full long)
+    Neutral :  0.00   (flat / cash — no edge)
+    Bear    : -0.50   (defensive short)
 
-Scoring architecture (5 × 21 signed weights):
+Scoring architecture (3 × 21 signed weights):
 
     For each regime r at bar t:
       score_r(t) = sum_i  W[r, i] * b_i(t)
 
     where b_i(t) is the i-th basis function applied to the i-th v2
-    feature at bar t. Most basis functions are linear in the [0, 1]
-    normalised feature; the Full Bear regime adds non-linear ``g(x) =
-    max(0, min(1, (x-0.5)*2))`` gates on its tail-event features so it
-    only scores when DD / vol / shock are genuinely in the top half of
-    their rolling-252 range. This mirrors the audit §5.3.1 fix that
-    the dashboard added in v9.4 for its Crisis regime.
+    feature at bar t. Bear regime adds non-linear ``g(x) =
+    max(0, min(1, (x-0.5)*2))`` gates on tail-event features so it
+    only fires when DD / vol / shock are genuinely in the top half of
+    their rolling-252 range.
 
-    Weights are hand-tuned via financial intuition (NOT data-fitted —
-    learning the weights would defeat the point of having a rule
-    baseline). Each weight is the importance of that feature for that
-    regime, signed to indicate direction (positive = "high feature
-    value favours this regime", negative = "low feature value favours
-    this regime").
+    Weights hand-tuned via financial intuition (NOT data-fitted).
 
 Causal hygiene: every input is already ``.shift(1)``-clean from
-``compute_features_v2``. The rolling-252 min-max renormalisation here
-is past-only by construction. The Stabilizer is feedback-clean
-(majority vote on raw labels, not stabilised history — same trick the
-legacy dashboard used to avoid sticky-trap pathology).
-
-Architectural choices that diverge from legacy dashboard:
-  - 5 regimes, not 6 (cleaner directional taxonomy, fewer params)
-  - Signed linear weights (not unsigned + (1-x) tricks)
-  - Single gating non-linearity, scoped to Full Bear only
-  - Weights expressed as 5x21 numpy matrix rather than a dict of basis
-    closures (easier to inspect, hand-tune, and unit-test)
-
-Same as legacy:
-  - SOFTMAX_TEMP = 2.8 (audit §5.3.2)
-  - Stabilizer hyperparameters (HYSTERESIS_THRESH=0.04, MIN_PERSIST=1,
-    MAJORITY_WIN=2 — audit §5.4)
-  - Crisis promote thresholds (shock_z > 3.5 OR raw_dd > 15% per
-    audit §5.3.4)
-  - risk_condition over-extension penalty pattern
+``compute_features_v2``. Rolling-252 min-max renormalisation is
+past-only. Stabilizer uses majority vote on raw labels — no sticky-trap.
 
 References
 ----------
-``etc/regime_dashboard.py:986-1198`` — the 6-regime classifier we're
-   replacing as Regime_v2's rule baseline.
+``etc/regime_dashboard.py:986-1198`` — legacy 6-regime classifier.
 """
 
 from __future__ import annotations
@@ -82,22 +48,18 @@ import pandas as pd
 # Taxonomy
 # ---------------------------------------------------------------------------
 
-N_REGIMES = 5
+N_REGIMES = 3
 REGIME_NAMES = {
-    0: "Full Bull",
-    1: "Half Bull",
-    2: "Chop",
-    3: "Half Bear",
-    4: "Full Bear",
+    0: "Bull",
+    1: "Neutral",
+    2: "Bear",
 }
 REGIME_ALLOC = {
-    0:  1.00,
-    1:  0.70,
-    2:  0.20,
-    3: -0.20,
-    4: -0.50,
+    0:  1.00,   # full long
+    1:  0.00,   # flat — no edge in sideways
+    2: -0.50,   # defensive short
 }
-FULL_BEAR = 4  # used by the riskoff_confirm gate
+FULL_BEAR = 2  # Bear is the crisis state (used by _riskoff_confirm)
 
 
 # ---------------------------------------------------------------------------
@@ -164,108 +126,93 @@ assert len(V2_FEATURE_ORDER) == 21
 #
 # Columns correspond to V2_FEATURE_ORDER.
 
-_W_FULL_BULL = np.array([
+# Bull (0): strong positive momentum, low vol, shallow drawdown, risk-on macro
+_W_BULL = np.array([
     # mom_5, mom_20, mom_63, mom_252
-    +0.04, +0.08, +0.08, +0.04,
+    +0.05, +0.10, +0.10, +0.06,
     # vol_short, vol_ewma, vol_long, vol_yearly
-    -0.06, -0.10, -0.06, -0.03,
+    -0.08, -0.12, -0.07, -0.04,
     # vol_ratio_sl, vol_ratio_ly
-    -0.04, -0.02,
+    -0.05, -0.03,
     # shock_z
-    -0.04,
-    # drawdown_252  (drawdown is in [-1, 0]; normed will be in [0, 1] where
-    # 0 = deepest DD, 1 = at the high. So we WANT high normed value.)
-    +0.10,
+    -0.06,
+    # drawdown_252 (normed: 1=at high, 0=deepest DD — want high)
+    +0.13,
     # autocorr_63
     0.0,
     # trend_dir
-    +0.12,
+    +0.14,
     # vix_log, vix_change, vix_term
-    -0.05, -0.02, -0.03,
-    # corr_tlt_63, corr_gld_63 — risk-on: stocks/bonds move OPPOSITELY
-    -0.02, 0.0,
-    # term_spread (steep curve = healthy economy)
-    +0.03,
-    # credit_spread (tight = bullish)
-    -0.04,
-])
-
-_W_HALF_BULL = np.array([
-    +0.03, +0.05, +0.05, +0.03,
-    -0.04, -0.06, -0.04, -0.02,
-    -0.02, -0.01,
-    -0.02,
-    +0.07,
-    +0.02,
-    +0.06,
-    -0.03, -0.01, -0.02,
-    -0.01, 0.0,
-    +0.02,
-    -0.02,
-])
-
-_W_CHOP = np.array([
-    -0.02, -0.03, -0.02, 0.0,
-    +0.03, +0.04, +0.03, 0.0,
-    +0.02, +0.02,
-    +0.02,
-    +0.02,
-    # Chop's signature is mean-reversion → high (rolling) autocorr
-    +0.10,
-    # No directional preference
-    -0.02,  # mildly disfavours strong directional trend_dir
-    +0.02, 0.0, +0.02,
-    0.0, +0.01,
-    0.0,
-    +0.02,
-])
-
-_W_HALF_BEAR = np.array([
-    -0.04, -0.06, -0.05, -0.03,
-    +0.04, +0.06, +0.04, +0.02,
-    +0.03, +0.02,
-    +0.05,
-    -0.07,  # deeper DD (low normed value) favours this regime
-    +0.01,
-    -0.07,  # negative trend_dir
-    +0.05, +0.03, +0.04,
-    +0.02, +0.02,
-    -0.02,
+    -0.07, -0.03, -0.04,
+    # corr_tlt_63, corr_gld_63
+    -0.03, 0.0,
+    # term_spread
     +0.04,
+    # credit_spread
+    -0.05,
 ])
 
-# Full Bear differs: applies a tail-gate ``g(x) = max(0, min(1, (x-0.5)*2))``
-# on its biggest signals (drawdown, vol, shock, vix, credit spread) so it
-# only fires when those features are in the TOP HALF of their rolling-252
-# range. This is the audit-§5.3.1 fix the legacy dashboard added in v9.4.
-# The flag column says: which features to gate (g(x)) vs use raw normed.
-_W_FULL_BEAR = np.array([
-    -0.04, -0.05, -0.04, -0.02,
-    +0.05, +0.07, +0.06, +0.03,   # gated below
-    +0.04, +0.02,
-    +0.08,                          # gated
-    -0.10,                          # GATED on deep DD direction
-    0.0,
-    -0.06,                          # strong negative trend_dir
-    +0.08, +0.05, +0.06,            # vix_log gated
-    +0.03, +0.03,
+# Neutral (1): sideways / mean-reverting, no directional edge
+_W_NEUTRAL = np.array([
+    # mom_5, mom_20, mom_63, mom_252
+    -0.02, -0.03, -0.02, 0.0,
+    # vol_short, vol_ewma, vol_long, vol_yearly
+    +0.03, +0.04, +0.03, 0.0,
+    # vol_ratio_sl, vol_ratio_ly
+    +0.02, +0.02,
+    # shock_z
+    +0.02,
+    # drawdown_252
+    +0.02,
+    # high autocorr is Neutral's signature (mean-reverting chop)
+    +0.12,
+    # trend_dir — mildly penalise strong directional trend
     -0.04,
-    +0.06,                          # gated
+    # vix_log, vix_change, vix_term
+    +0.02, 0.0, +0.02,
+    # corr_tlt_63, corr_gld_63
+    0.0, +0.01,
+    # term_spread
+    0.0,
+    # credit_spread
+    +0.02,
 ])
 
-# Which features get gated for Full Bear (True = apply g(x) instead of raw).
+# Bear (2): negative momentum, high vol, deep DD, risk-off macro.
+# Tail-gate applied to biggest signals — only fires when they are in
+# the TOP HALF of their rolling-252 range (same gate as legacy Full Bear).
+_W_BEAR = np.array([
+    # mom_5, mom_20, mom_63, mom_252
+    -0.06, -0.08, -0.07, -0.04,
+    # vol_short, vol_ewma, vol_long, vol_yearly  (gated)
+    +0.07, +0.10, +0.08, +0.04,
+    # vol_ratio_sl, vol_ratio_ly
+    +0.05, +0.03,
+    # shock_z  (gated)
+    +0.10,
+    # drawdown_252  (gated — deep DD direction)
+    -0.13,
+    # autocorr_63
+    0.0,
+    # trend_dir
+    -0.08,
+    # vix_log (gated), vix_change, vix_term
+    +0.10, +0.06, +0.07,
+    # corr_tlt_63, corr_gld_63
+    +0.04, +0.04,
+    # term_spread
+    -0.05,
+    # credit_spread  (gated)
+    +0.08,
+])
+
+# Which features get the tail-gate g(x) for Bear.
 _FULL_BEAR_GATED = np.zeros(21, dtype=bool)
 _FULL_BEAR_GATED[[4, 5, 6, 10, 11, 14, 20]] = True
 #  vol_short(4), vol_ewma(5), vol_long(6), shock_z(10),
 #  drawdown_252(11), vix_log(14), credit_spread(20)
 
-_DEFAULT_WEIGHTS = np.vstack([
-    _W_FULL_BULL,
-    _W_HALF_BULL,
-    _W_CHOP,
-    _W_HALF_BEAR,
-    _W_FULL_BEAR,
-])
+_DEFAULT_WEIGHTS = np.vstack([_W_BULL, _W_NEUTRAL, _W_BEAR])
 assert _DEFAULT_WEIGHTS.shape == (N_REGIMES, 21)
 
 
@@ -302,16 +249,16 @@ def _g(x: float) -> float:
 
 
 def _row_score(features_normed: np.ndarray) -> np.ndarray:
-    """Compute the 5-regime raw score vector for one bar.
+    """Compute the 3-regime raw score vector for one bar.
 
     ``features_normed`` is shape (21,), each value in [0, 1].
-    Returns a length-5 score vector (NOT softmaxed yet).
+    Returns a length-3 score vector (NOT softmaxed yet).
     """
     scores = np.zeros(N_REGIMES, dtype=float)
-    # Regimes 0-3: linear dot product
+    # Bull (0) and Neutral (1): linear dot product
     for r in range(N_REGIMES - 1):
         scores[r] = float(np.dot(_DEFAULT_WEIGHTS[r], features_normed))
-    # Regime 4 (Full Bear): apply g() on gated features before dot product
+    # Bear (2): apply g() on tail-event features before dot product
     bear_basis = features_normed.copy()
     for i in np.where(_FULL_BEAR_GATED)[0]:
         bear_basis[i] = _g(features_normed[i])
@@ -366,11 +313,10 @@ def _risk_condition(
     sc = sc.copy()
     if current is not None and persist > OVEREXT_BARS:
         sc[current] *= (1.0 - OVEREXT_PENALTY)
-    # Chop (2) suppression when vol keeps rising: escalate to Half Bear (3)
-    # or Half Bull (1) depending on which scored higher.
-    if current == 2 and persist > 30 and vol_prev is not None and vol_n > vol_prev:
-        best = 3 if sc[3] >= sc[1] else 1
-        sc[2] = min(sc[2], sc[best] - 0.01)
+    # Neutral (1) suppression when vol keeps rising: escalate toward Bear (2) or Bull (0).
+    if current == 1 and persist > 30 and vol_prev is not None and vol_n > vol_prev:
+        best = 2 if sc[2] >= sc[0] else 0
+        sc[1] = min(sc[1], sc[best] - 0.01)
     return sc
 
 
@@ -410,14 +356,14 @@ _cache: dict = {}  # retained for the test that clears it (no-op now)
 
 
 def compute_rule_regime_sequence(features_v2: pd.DataFrame) -> pd.DataFrame:
-    """Run the 5-regime rule classifier over an entire feature frame.
+    """Run the 3-regime rule classifier over an entire feature frame.
 
     Returns
     -------
     pd.DataFrame
         Indexed identically to ``features_v2``, with columns:
-          ``p_0..p_4``  : softmaxed regime probabilities
-          ``label``     : stabilised regime label in {0..4}
+          ``p_0..p_2``  : softmaxed regime probabilities (Bull/Neutral/Bear)
+          ``label``     : stabilised regime label in {0, 1, 2}
           ``regime``    : the human-readable regime name
           ``position``  : the per-regime allocation from REGIME_ALLOC
     """

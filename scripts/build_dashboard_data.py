@@ -65,13 +65,11 @@ ASSET_NAMES: Dict[str, str] = {
     "JPY=X":   "USD / JPY",
 }
 
-# 5-regime taxonomy color palette (Bloomberg dark)
+# 3-regime color palette (Bloomberg dark)
 REGIME_COLORS = {
-    0: "#22c55e",  # Full Bull — green
-    1: "#84cc16",  # Half Bull — lime
-    2: "#a3a3a3",  # Chop      — grey
-    3: "#f97316",  # Half Bear — orange
-    4: "#ef4444",  # Full Bear — red
+    0: "#22c55e",  # Bull    — green
+    1: "#a3a3a3",  # Neutral — grey
+    2: "#ef4444",  # Bear    — red
 }
 
 # Validation report metrics (frozen — they don't move bar-to-bar).
@@ -212,8 +210,6 @@ def _build_asset_payload(
             "p0": _finite(row["p_0"]),
             "p1": _finite(row["p_1"]),
             "p2": _finite(row["p_2"]),
-            "p3": _finite(row["p_3"]),
-            "p4": _finite(row["p_4"]),
             "tvtp_low":  _finite(row["tvtp_low_vol"]),
             "tvtp_high": _finite(row["tvtp_high_vol"]),
             "tvtp_pos":  _finite(row["tvtp_position"]),
@@ -227,7 +223,6 @@ def _build_asset_payload(
     last_label = int(last["label"])
     last_probs = [
         _finite(last["p_0"]), _finite(last["p_1"]), _finite(last["p_2"]),
-        _finite(last["p_3"]), _finite(last["p_4"]),
     ]
     last_tvtp_pos = _finite(last.get("tvtp_position", 0.0)) or 0.0
     last_tvtp_low = _finite(last.get("tvtp_low_vol", 0.0)) or 0.0
@@ -235,7 +230,7 @@ def _build_asset_payload(
 
     # Transition matrix on the rule-baseline label sequence (3y)
     trans_window = aligned["label"].tail(min(len(aligned), 252 * 3)).astype(int)
-    transition_matrix = _empirical_transition_matrix(trans_window.to_numpy(), n_states=5)
+    transition_matrix = _empirical_transition_matrix(trans_window.to_numpy(), n_states=3)
 
     return {
         "ticker": ticker,

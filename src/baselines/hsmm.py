@@ -23,11 +23,10 @@ Architecture (pragmatic v1 — no hsmmlearn dependency):
      for the Weibull distribution conditioned on already-observed
      persistence ``d`` bars in the current state.
 
-State → position mapping (K=4 default, ordered by ascending variance):
-    state 0 (lowest var, Full Bull):   +1.00
-    state 1 (Half Bull):                +0.50
-    state 2 (Half Bear):                -0.20
-    state 3 (highest var, Full Bear):   -0.50
+State → position mapping (K=3 default, ordered by ascending variance):
+    state 0 (lowest var, Bull):    +1.00
+    state 1 (Neutral):              0.00
+    state 2 (highest var, Bear):   -0.50
 
 Outputs:
     fit() → self
@@ -55,12 +54,11 @@ from scipy import stats
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="hmmlearn")
 
 
-# Default 4-state position mapping per the audit's K=4 prescription.
-DEFAULT_K4_POSITIONS: Dict[int, float] = {
-    0:  1.00,   # lowest-variance: Full Bull
-    1:  0.50,   # Half Bull
-    2: -0.20,   # Half Bear
-    3: -0.50,   # highest-variance: Full Bear
+# Default 3-state position mapping: Bull / Neutral / Bear
+DEFAULT_K3_POSITIONS: Dict[int, float] = {
+    0:  1.00,   # lowest-variance: Bull
+    1:  0.00,   # Neutral (flat)
+    2: -0.50,   # highest-variance: Bear
 }
 
 
@@ -100,7 +98,7 @@ class DurationAwareHMM:
     def __init__(
         self,
         *,
-        k_states: int = 4,
+        k_states: int = 3,
         covariance_type: str = "diag",
         n_iter: int = 100,
         seed: int = 42,
@@ -343,7 +341,7 @@ class DurationAwareHMM:
 
 def make_hsmm_strategy(
     *,
-    k_states: int = 4,
+    k_states: int = 3,
     state_positions: Optional[Dict[int, float]] = None,
     feature_cols: Optional[List[str]] = None,
     close_col: str = "close",
@@ -354,14 +352,14 @@ def make_hsmm_strategy(
       1. Pick ``feature_cols`` from features_train; default = every
          column except ``close``.
       2. Fit ``DurationAwareHMM`` on train features.
-      3. Predict state probabilities on (train ∪ test) — Viterbi smoothed.
+      3. Predict state probabilities on (train ∪ test) — forward-only filter.
       4. Map state probabilities to positions using ``state_positions``.
 
-    Defaults to ``DEFAULT_K4_POSITIONS`` (Full Bull/Half Bull/Half Bear/
-    Full Bear ordered by ascending variance).
+    Defaults to ``DEFAULT_K3_POSITIONS`` (Bull/Neutral/Bear ordered by
+    ascending variance).
     """
     if state_positions is None:
-        state_positions = DEFAULT_K4_POSITIONS
+        state_positions = DEFAULT_K3_POSITIONS
 
     def strategy_fn(
         features_train: pd.DataFrame, features_test: pd.DataFrame
@@ -405,6 +403,6 @@ def make_hsmm_strategy(
 
 __all__ = [
     "DurationAwareHMM",
-    "DEFAULT_K4_POSITIONS",
+    "DEFAULT_K3_POSITIONS",
     "make_hsmm_strategy",
 ]

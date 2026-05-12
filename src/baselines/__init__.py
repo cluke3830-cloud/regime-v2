@@ -7,7 +7,7 @@ harness, increasing ensemble diversity and reducing PBO toward < 50%.
 """
 
 from src.baselines.hsmm import (
-    DEFAULT_K4_POSITIONS,
+    DEFAULT_K3_POSITIONS,
     DurationAwareHMM,
     make_hsmm_strategy,
 )
@@ -25,7 +25,7 @@ __all__ = [
     "MarkovSwitchingAR",
     "make_tvtp_msar_strategy",
     "DurationAwareHMM",
-    "DEFAULT_K4_POSITIONS",
+    "DEFAULT_K3_POSITIONS",
     "make_hsmm_strategy",
     "GARCHVolatilityModel",
     "evaluate_forecast_rmse_vs_rolling",
