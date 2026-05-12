@@ -51,7 +51,9 @@ jobs:
       - name: Regenerate snapshots
         env:
           REGIME_V2_NO_CACHE: "1"
-          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          # `|| ''` fallback so forks without FRED_API_KEY still run
+          # (FRED fetch fails gracefully → None → bundle degrades).
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY || '' }}
         run: python scripts/build_dashboard_data.py
 
       - name: Commit refreshed data
