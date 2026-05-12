@@ -131,7 +131,9 @@ def test_single_strategy_n_paths_matches_combinatorial():
 
 def test_buy_and_hold_tracks_underlying():
     """Buy-and-hold's concatenated OOS returns must equal the bar returns
-    on the test indices (positions = +1 everywhere).
+    on the test indices (positions = +1 everywhere). Frictionless
+    (cost_bps=0) so the bar-0 entry cost doesn't show up here — this
+    test gates the position × return math, not the cost layer.
     """
     features, returns = _make_synthetic(n=400)
     report = run_cpcv_validation(
@@ -140,11 +142,33 @@ def test_buy_and_hold_tracks_underlying():
         returns,
         n_splits=8,
         n_test_groups=2,
+        cost_bps=0.0,
     )
     for path_id, series in report.oos_returns.items():
         # series should equal returns at the same dates
         expected = returns.loc[series.index]
         assert np.allclose(series.values, expected.values)
+
+
+def test_cost_bps_charges_entry_position():
+    """With cost_bps=2 (default) and buy_and_hold (positions = +1 forever),
+    the first bar of every OOS path should be debited 2 bps (entering the
+    +1 position from flat). All subsequent bars have Δposition = 0 → no
+    cost, so they must still equal the underlying bar return.
+    """
+    features, returns = _make_synthetic(n=400)
+    report = run_cpcv_validation(
+        buy_and_hold,
+        features,
+        returns,
+        n_splits=8,
+        n_test_groups=2,
+        cost_bps=2.0,
+    )
+    for path_id, series in report.oos_returns.items():
+        expected = returns.loc[series.index].values.copy()
+        expected[0] -= 2e-4  # bar 0: |1 - 0| × 2 bps = 2 bps
+        assert np.allclose(series.values, expected)
 
 
 def test_features_returns_alignment_validation():

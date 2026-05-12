@@ -39,15 +39,20 @@ STATE_COLORS = {0: "#22c55e", 1: "#a3a3a3", 2: "#ef4444"}
 
 
 def _build_features(close: pd.Series, vol_halflife: int = 20) -> pd.DataFrame:
-    """Build a tiny 2-feature frame: log return + EWMA vol.
+    """Build a tiny 2-feature frame: log return + lag-1 EWMA vol.
 
-    Vol is EWMA-of-past-squared-returns (causal by construction). The log
-    return at bar t is the contemporaneous return — callers must shift
-    output positions by one bar before trading to avoid lookahead.
+    Vol is explicitly lagged by one bar (``.shift(1)``) so it depends only
+    on returns through ``t-1`` — matching the rule-baseline convention in
+    ``compute_features_v2`` (Brief 2.2) and removing any same-bar overlap
+    between the return feature and the vol feature.
+
+    The log return at bar t remains the contemporaneous return; callers
+    must still shift output positions by one bar before trading to avoid
+    lookahead.
     """
     r = np.log(close).diff()
     sq = r.pow(2)
-    vol = sq.ewm(halflife=vol_halflife, adjust=False).mean().pow(0.5)
+    vol = sq.ewm(halflife=vol_halflife, adjust=False).mean().pow(0.5).shift(1)
     out = pd.DataFrame({"r": r, "vol": vol}).dropna()
     return out
 

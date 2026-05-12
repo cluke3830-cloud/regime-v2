@@ -75,6 +75,7 @@ from src.validation.multi_asset import (  # noqa: E402
     make_feature_fn_v2,
     multi_asset_summary,
 )
+from src.validation.strategy_registry import N_TRIALS_REGISTERED  # noqa: E402
 
 
 CACHE_DIR = ROOT / "data" / "cache"
@@ -255,10 +256,10 @@ def main() -> int:
         n_test_groups=2,
         embargo_pct=0.01,
         label_horizons=label_horizons,
-        # Trial accounting (audit §8.1.2): 113 (through Phase 3) +
-        # 1 (patchtst, fixed config) + 1 (conformal_xgb, fixed config).
-        # Total = 115; round up to 200 for safety.
-        n_trials=200,
+        # Trial accounting lives in src/validation/strategy_registry.py.
+        # Bump N_TRIALS_REGISTERED there whenever a new variant is added
+        # — never adjust it inline here.
+        n_trials=N_TRIALS_REGISTERED,
         seed=42,
     )
 

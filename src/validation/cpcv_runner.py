@@ -67,7 +67,17 @@ from src.validation.deflated_sharpe import (
 # 0 = flat. Fractional values for risk-scaled positions are fine.
 StrategyFn = Callable[[pd.DataFrame, pd.DataFrame], np.ndarray]
 
+from .strategy_registry import N_TRIALS_REGISTERED
+
 ANN_FACTOR_DAILY = 252
+
+# Transaction cost (one-way, in basis points) applied to |Δposition| per bar.
+# 2 bps is the industry-standard liquid-ETF/large-cap-stock commission +
+# spread cost at retail brokers (IBKR Tier-1, Fidelity zero-commission with
+# realistic spreads). Per-bar cost = (COST_BPS_DEFAULT / 1e4) × |Δposition_t|.
+# A full +1 → -1 flip costs 4 bps; a +1 → 0 unwind costs 2 bps.
+# Set ``cost_bps=0`` in the runner to recover the frictionless backtest.
+COST_BPS_DEFAULT = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +104,11 @@ class PathMetrics:
 @dataclass
 class ValidationReport:
     """Aggregate CPCV validation report for a single strategy.
+
+    All Sharpe / Sortino / max-DD / Calmar / DSR figures are NET of a
+    one-way transaction cost of ``COST_BPS_DEFAULT`` (currently 2 bps)
+    applied to |Δposition| per bar. Override at the runner via
+    ``cost_bps=0`` to recover the frictionless backtest.
 
     The OOS return series across all paths are kept on the report so the
     caller can recompute alternative aggregations (rolling, regime-
@@ -203,9 +218,10 @@ def run_cpcv_validation(
     n_test_groups: int = 2,
     embargo_pct: float = 0.01,
     label_horizons: Optional[np.ndarray] = None,
-    n_trials: int = 500,
+    n_trials: int = N_TRIALS_REGISTERED,
     seed: int = 42,
     ann_factor: int = ANN_FACTOR_DAILY,
+    cost_bps: float = COST_BPS_DEFAULT,
 ) -> ValidationReport:
     """Run a single strategy through CPCV and return its ValidationReport.
 
@@ -227,12 +243,19 @@ def run_cpcv_validation(
         Forwarded to :class:`CombinatorialPurgedKFold`.
     n_trials : int
         Number of model variants explored — used by DSR deflation.
-        Pre-register this number; do not tune.
+        Pre-register this number; do not tune. Defaults to
+        ``strategy_registry.N_TRIALS_REGISTERED`` (currently 200,
+        derived from 15 strategies + 10 universes + 36 HPO grid + slack).
     seed : int
         For any RNG used inside strategy_fn (the harness itself is
         deterministic).
     ann_factor : int
         Annualisation factor (252 for daily).
+    cost_bps : float
+        One-way transaction cost in basis points, applied to |Δposition|
+        per bar. Default 2 bps (see ``COST_BPS_DEFAULT``). All downstream
+        metrics (Sharpe, Sortino, max-DD, Calmar, DSR) are net-of-cost.
+        Set ``cost_bps=0`` to recover the frictionless backtest.
 
     Returns
     -------
@@ -277,7 +300,14 @@ def run_cpcv_validation(
                 f"{len(test_idx)} test bars on path {path_id}"
             )
 
-        strategy_returns = positions * bar_returns
+        gross_returns = positions * bar_returns
+        # Transaction cost: cost_bps × |Δposition| per bar. prepend=0 charges
+        # the cost of entering the very first position on the path.
+        if cost_bps > 0:
+            tc = (cost_bps / 1e4) * np.abs(np.diff(positions, prepend=0.0))
+            strategy_returns = gross_returns - tc
+        else:
+            strategy_returns = gross_returns
         oos_returns[path_id] = pd.Series(
             strategy_returns,
             index=features_df.index[test_idx],
@@ -348,9 +378,10 @@ def run_cpcv_multi_strategy(
     n_test_groups: int = 2,
     embargo_pct: float = 0.01,
     label_horizons: Optional[np.ndarray] = None,
-    n_trials: int = 500,
+    n_trials: int = N_TRIALS_REGISTERED,
     seed: int = 42,
     ann_factor: int = ANN_FACTOR_DAILY,
+    cost_bps: float = COST_BPS_DEFAULT,
 ) -> Dict[str, ValidationReport]:
     """Run N strategies through the SAME CPCV folds → PBO is well-defined.
 
@@ -399,13 +430,21 @@ def run_cpcv_multi_strategy(
 
         for s_idx, name in enumerate(names):
             fn = strategies[name]
-            # IS positions: same model trained on train, evaluated on train
-            is_positions = fn(f_train, f_train)
-            is_returns = np.asarray(is_positions, dtype=float) * r_train
+            # IS positions: same model trained on train, evaluated on train.
+            # Apply cost on IS too so the IS Sharpe (feeds PBO) is consistent
+            # with the OOS Sharpe — otherwise PBO inflates artificially.
+            is_positions = np.asarray(fn(f_train, f_train), dtype=float)
+            is_returns = is_positions * r_train
+            if cost_bps > 0:
+                is_tc = (cost_bps / 1e4) * np.abs(np.diff(is_positions, prepend=0.0))
+                is_returns = is_returns - is_tc
             is_sharpes[path_id, s_idx] = annualised_sharpe(is_returns, ann_factor)
 
-            oos_positions = fn(f_train, f_test)
-            oos_returns_arr = np.asarray(oos_positions, dtype=float) * r_test
+            oos_positions = np.asarray(fn(f_train, f_test), dtype=float)
+            oos_returns_arr = oos_positions * r_test
+            if cost_bps > 0:
+                oos_tc = (cost_bps / 1e4) * np.abs(np.diff(oos_positions, prepend=0.0))
+                oos_returns_arr = oos_returns_arr - oos_tc
             oos_sharpes[path_id, s_idx] = annualised_sharpe(oos_returns_arr, ann_factor)
 
             per_strategy_oos[name][path_id] = pd.Series(

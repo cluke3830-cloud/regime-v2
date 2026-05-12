@@ -76,19 +76,21 @@ REGIME_COLORS = {
     2: "#ef4444",  # Bear    — red
 }
 
-# Validation report metrics (frozen — they don't move bar-to-bar).
-# Pulled from validation_report.md.
+# Validation report metrics — multi-asset robustness of the champion
+# (ms_garch) net of 2 bps × |Δposition| transaction cost. Pulled from
+# validation_report.md. Bump whenever `make validate` reshuffles the
+# champion or shifts the cost model.
 ASSET_BACKTEST_STATS: Dict[str, Dict[str, float]] = {
-    "SPY":     {"sharpe_p05": 1.487, "sharpe_p50": 2.462, "sharpe_p95": 3.158, "max_dd_p50": -0.036, "dsr_sharpe": 2.366},
-    "QQQ":     {"sharpe_p05": 1.749, "sharpe_p50": 2.391, "sharpe_p95": 3.175, "max_dd_p50": -0.053, "dsr_sharpe": 2.391},
-    "DIA":     {"sharpe_p05": 1.180, "sharpe_p50": 2.086, "sharpe_p95": 3.038, "max_dd_p50": -0.048, "dsr_sharpe": 2.086},
-    "IWM":     {"sharpe_p05": 0.021, "sharpe_p50": 0.949, "sharpe_p95": 1.989, "max_dd_p50": -0.109, "dsr_sharpe": 0.949},
-    "EFA":     {"sharpe_p05": 0.021, "sharpe_p50": 0.836, "sharpe_p95": 1.808, "max_dd_p50": -0.091, "dsr_sharpe": 0.836},
-    "EEM":     {"sharpe_p05": -0.405, "sharpe_p50": 0.908, "sharpe_p95": 1.902, "max_dd_p50": -0.113, "dsr_sharpe": 0.908},
-    "GLD":     {"sharpe_p05": -0.220, "sharpe_p50": 1.042, "sharpe_p95": 2.620, "max_dd_p50": -0.091, "dsr_sharpe": 1.042},
-    "TLT":     {"sharpe_p05": -1.510, "sharpe_p50": 0.240, "sharpe_p95": 1.313, "max_dd_p50": -0.114, "dsr_sharpe": 0.000},
-    "BTC-USD": {"sharpe_p05": 0.160, "sharpe_p50": 1.149, "sharpe_p95": 2.599, "max_dd_p50": -0.209, "dsr_sharpe": 1.149},
-    "JPY=X":   {"sharpe_p05": 0.049, "sharpe_p50": 0.937, "sharpe_p95": 1.529, "max_dd_p50": -0.029, "dsr_sharpe": 0.937},
+    "SPY":     {"sharpe_p05":  0.083, "sharpe_p50": 1.025, "sharpe_p95": 2.098, "max_dd_p50": -0.113, "dsr_sharpe": 1.025},
+    "QQQ":     {"sharpe_p05":  0.019, "sharpe_p50": 0.958, "sharpe_p95": 1.987, "max_dd_p50": -0.128, "dsr_sharpe": 0.958},
+    "DIA":     {"sharpe_p05": -0.069, "sharpe_p50": 0.937, "sharpe_p95": 2.066, "max_dd_p50": -0.123, "dsr_sharpe": 0.937},
+    "IWM":     {"sharpe_p05": -0.664, "sharpe_p50": 0.284, "sharpe_p95": 1.342, "max_dd_p50": -0.157, "dsr_sharpe": 0.284},
+    "EFA":     {"sharpe_p05": -0.485, "sharpe_p50": 0.259, "sharpe_p95": 1.388, "max_dd_p50": -0.150, "dsr_sharpe": 0.259},
+    "EEM":     {"sharpe_p05": -0.902, "sharpe_p50": 0.153, "sharpe_p95": 1.293, "max_dd_p50": -0.175, "dsr_sharpe": 0.153},
+    "GLD":     {"sharpe_p05": -0.046, "sharpe_p50": 0.650, "sharpe_p95": 1.496, "max_dd_p50": -0.153, "dsr_sharpe": 0.650},
+    "TLT":     {"sharpe_p05": -0.964, "sharpe_p50": -0.082, "sharpe_p95": 1.017, "max_dd_p50": -0.205, "dsr_sharpe": 0.000},
+    "BTC-USD": {"sharpe_p05": -0.306, "sharpe_p50": 0.930, "sharpe_p95": 2.044, "max_dd_p50": -0.230, "dsr_sharpe": 0.930},
+    "JPY=X":   {"sharpe_p05": -0.726, "sharpe_p50": 0.328, "sharpe_p95": 1.282, "max_dd_p50": -0.129, "dsr_sharpe": 0.328},
 }
 
 
