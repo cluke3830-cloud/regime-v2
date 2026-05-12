@@ -43,6 +43,10 @@ if str(ROOT) not in sys.path:
 from src.baselines.tvtp_msar import MarkovSwitchingAR  # noqa: E402
 from src.features.aux_data import fetch_aux_data_bundle  # noqa: E402
 from src.features.price_features import compute_features_v2  # noqa: E402
+from src.regime.gmm_hmm import (  # noqa: E402
+    STATE_NAMES as GMM_STATE_NAMES,
+    compute_gmm_hmm_sequence,
+)
 from src.regime.rule_baseline import (  # noqa: E402
     REGIME_ALLOC,
     REGIME_NAMES,
@@ -157,6 +161,9 @@ def _build_asset_payload(
     # TVTP-MSAR (the champion)
     tvtp = _compute_tvtp_probs(close)
 
+    # GMM+HMM — unsupervised regime detector (complement to rule baseline)
+    gmm = compute_gmm_hmm_sequence(close)
+
     # Align everything to the rule_seq index
     aligned = rule_seq.copy()
     aligned["close"] = close.reindex(aligned.index)
@@ -168,6 +175,16 @@ def _build_asset_payload(
         aligned["tvtp_low_vol"] = np.nan
         aligned["tvtp_high_vol"] = np.nan
         aligned["tvtp_position"] = 0.0
+    if gmm is not None:
+        aligned["gmm_p0"] = gmm["p_0"].reindex(aligned.index)
+        aligned["gmm_p1"] = gmm["p_1"].reindex(aligned.index)
+        aligned["gmm_p2"] = gmm["p_2"].reindex(aligned.index)
+        aligned["gmm_label"] = gmm["label"].reindex(aligned.index).fillna(1).astype(int)
+    else:
+        aligned["gmm_p0"] = np.nan
+        aligned["gmm_p1"] = np.nan
+        aligned["gmm_p2"] = np.nan
+        aligned["gmm_label"] = 1
 
     # ------------------------------------------------------------------
     # Walk-forward equity curves (each at unit notional, t-1 signal → t return)
@@ -210,6 +227,10 @@ def _build_asset_payload(
             "p0": _finite(row["p_0"]),
             "p1": _finite(row["p_1"]),
             "p2": _finite(row["p_2"]),
+            "gmm_label": int(row["gmm_label"]),
+            "gmm_p0": _finite(row["gmm_p0"]),
+            "gmm_p1": _finite(row["gmm_p1"]),
+            "gmm_p2": _finite(row["gmm_p2"]),
             "tvtp_low":  _finite(row["tvtp_low_vol"]),
             "tvtp_high": _finite(row["tvtp_high_vol"]),
             "tvtp_pos":  _finite(row["tvtp_position"]),
@@ -227,6 +248,13 @@ def _build_asset_payload(
     last_tvtp_pos = _finite(last.get("tvtp_position", 0.0)) or 0.0
     last_tvtp_low = _finite(last.get("tvtp_low_vol", 0.0)) or 0.0
     last_tvtp_high = _finite(last.get("tvtp_high_vol", 0.0)) or 0.0
+
+    last_gmm_label = int(last.get("gmm_label", 1))
+    last_gmm_probs = [
+        _finite(last.get("gmm_p0", 0.0)),
+        _finite(last.get("gmm_p1", 0.0)),
+        _finite(last.get("gmm_p2", 0.0)),
+    ]
 
     # Transition matrix on the rule-baseline label sequence (3y)
     trans_window = aligned["label"].tail(min(len(aligned), 252 * 3)).astype(int)
@@ -249,6 +277,11 @@ def _build_asset_payload(
             "p_high_vol": last_tvtp_high,
             "position":   last_tvtp_pos,
             "state":      "Low-Vol Bull" if last_tvtp_pos > 0 else "High-Vol Defense",
+        },
+        "current_gmm": {
+            "label": last_gmm_label,
+            "name":  GMM_STATE_NAMES.get(last_gmm_label, "—"),
+            "probs": last_gmm_probs,
         },
         "stats": ASSET_BACKTEST_STATS.get(ticker, {}),
         "transition_matrix": transition_matrix,

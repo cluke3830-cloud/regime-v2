@@ -1,0 +1,144 @@
+"""GMM + HMM regime classifier — lightweight 3-state unsupervised baseline.
+
+A complementary regime detector to the hand-tuned rule baseline. Where the
+rule baseline encodes financial intuition via signed weights on 21 features,
+this model lets the data speak: it fits a 3-state Gaussian HMM on a small
+returns + vol feature set, then maps states to Bull/Neutral/Bear by
+ascending variance (low-var → Bull, mid-var → Neutral, high-var → Bear).
+
+Why have both?
+- Rule baseline is interpretable but biased toward the designer's priors.
+- GMM+HMM is unsupervised; surprises in the data shift the regime
+  boundaries automatically.
+- Disagreement between the two flags ambiguity; agreement = high confidence.
+
+Architecture:
+- Features: log return + EWMA realised vol (lag-1 to be causal).
+- Model: hmmlearn GaussianHMM, full covariance, k_states=3.
+- Filter: Hamilton α-pass (forward-only — no future leakage).
+- Output: posterior P(Bull|t), P(Neutral|t), P(Bear|t) + Viterbi label.
+
+This is intentionally minimal — a 2-feature model is easier to reason about
+and less prone to overfitting than the 21-feature HSMM baseline.
+"""
+
+from __future__ import annotations
+
+import warnings
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="hmmlearn")
+
+
+N_STATES = 3
+STATE_NAMES = {0: "Bull", 1: "Neutral", 2: "Bear"}
+STATE_COLORS = {0: "#22c55e", 1: "#a3a3a3", 2: "#ef4444"}
+
+
+def _build_features(close: pd.Series, vol_halflife: int = 20) -> pd.DataFrame:
+    """Build a tiny 2-feature frame: log return + EWMA vol.
+
+    Causal: vol is EWMA-of-past-squared-returns, no shift needed (already
+    one-bar-lagged by construction).
+    """
+    r = np.log(close).diff()
+    sq = r.pow(2)
+    vol = sq.ewm(halflife=vol_halflife, adjust=False).mean().pow(0.5)
+    out = pd.DataFrame({"r": r, "vol": vol}).dropna()
+    return out
+
+
+def _forward_filter(hmm, X: np.ndarray) -> np.ndarray:
+    """Hamilton (1989) α-pass — causal, no backward smoothing."""
+    n = X.shape[0]
+    k = hmm.n_components
+    log_emit = hmm._compute_log_likelihood(X)
+    log_trans = np.log(np.maximum(hmm.transmat_, 1e-300))
+    log_start = np.log(np.maximum(hmm.startprob_, 1e-300))
+    alphas = np.zeros((n, k))
+    log_alpha = log_start + log_emit[0]
+    log_alpha -= np.logaddexp.reduce(log_alpha)
+    alphas[0] = np.exp(log_alpha)
+    for t in range(1, n):
+        log_alpha_prev = np.log(np.maximum(alphas[t - 1], 1e-300))
+        log_pred = np.logaddexp.reduce(log_alpha_prev[:, None] + log_trans, axis=0)
+        log_alpha = log_pred + log_emit[t]
+        log_alpha -= np.logaddexp.reduce(log_alpha)
+        alphas[t] = np.exp(log_alpha)
+    return alphas
+
+
+def compute_gmm_hmm_sequence(
+    close: pd.Series,
+    *,
+    seed: int = 42,
+    n_iter: int = 200,
+) -> Optional[pd.DataFrame]:
+    """Fit GMM+HMM on (log-return, EWMA vol) and return per-bar regime probs.
+
+    Returns
+    -------
+    DataFrame indexed identically to ``close[1:]`` (or None if the fit
+    fails) with columns:
+      ``p_0, p_1, p_2`` — posterior probabilities (Bull / Neutral / Bear)
+      ``label``         — Viterbi-style argmax remapped by variance
+      ``regime``        — human-readable name
+    """
+    from hmmlearn.hmm import GaussianHMM
+
+    feats = _build_features(close)
+    if len(feats) < 100:
+        return None
+    X = feats.to_numpy(dtype=float)
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            hmm = GaussianHMM(
+                n_components=N_STATES,
+                covariance_type="full",
+                n_iter=n_iter,
+                random_state=seed,
+                tol=1e-3,
+            )
+            hmm.fit(X)
+    except Exception:
+        return None
+
+    # Variance ranking on the vol-feature column (col 1) → canonical order.
+    try:
+        if hmm.covars_.ndim == 3:
+            vol_var = np.array([c[1, 1] for c in hmm.covars_])
+        else:
+            vol_var = hmm.covars_[:, 1]
+        order = np.argsort(vol_var)  # ascending: low → Bull, high → Bear
+        remap = {int(src): int(dst) for dst, src in enumerate(order)}
+    except Exception:
+        remap = {k: k for k in range(N_STATES)}
+
+    probs_raw = _forward_filter(hmm, X)
+    # Reorder columns to canonical
+    col_order = [None] * N_STATES
+    for raw, canon in remap.items():
+        col_order[canon] = raw
+    probs = probs_raw[:, col_order]
+
+    labels = probs.argmax(axis=1)
+    out = pd.DataFrame(
+        probs, index=feats.index,
+        columns=[f"p_{i}" for i in range(N_STATES)],
+    )
+    out["label"] = labels
+    out["regime"] = out["label"].map(STATE_NAMES)
+    return out
+
+
+__all__ = [
+    "N_STATES",
+    "STATE_NAMES",
+    "STATE_COLORS",
+    "compute_gmm_hmm_sequence",
+]

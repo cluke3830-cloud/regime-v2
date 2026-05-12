@@ -24,12 +24,22 @@ export interface HistoryBar {
   p0: number | null;
   p1: number | null;
   p2: number | null;
+  gmm_label: number;
+  gmm_p0: number | null;
+  gmm_p1: number | null;
+  gmm_p2: number | null;
   tvtp_low: number | null;
   tvtp_high: number | null;
   tvtp_pos: number | null;
   eq_tvtp: number | null;
   eq_rule: number | null;
   eq_bh: number | null;
+}
+
+export interface GmmMeta {
+  label: number;
+  name: string;
+  probs: (number | null)[];
 }
 
 export interface AssetPayload {
@@ -39,6 +49,7 @@ export interface AssetPayload {
   current_close: number | null;
   current_regime: RegimeMeta;
   current_tvtp: TvtpMeta;
+  current_gmm: GmmMeta;
   stats: {
     sharpe_p05?: number;
     sharpe_p50?: number;

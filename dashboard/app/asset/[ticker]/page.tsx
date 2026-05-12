@@ -191,6 +191,54 @@ export default async function AssetPage({
               </div>
             </div>
 
+            <div className="panel p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
+                  GMM + HMM · UNSUPERVISED REGIME
+                </div>
+                <div className="font-mono text-[10px] uppercase tracking-wider">
+                  <span style={{ color: REGIME_COLORS[asset.current_gmm.label] ?? "#a3a3a3" }}>
+                    {asset.current_gmm.name}
+                  </span>
+                  {asset.current_gmm.label === asset.current_regime.label ? (
+                    <span className="ml-2 text-accent-green">✓ AGREES</span>
+                  ) : (
+                    <span className="ml-2 text-amber-400">⚠ DIVERGES</span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                {asset.current_gmm.probs.map((p, i) => {
+                  const c = REGIME_COLORS[i] ?? "#a3a3a3";
+                  const w = p === null ? 0 : Math.max(0, Math.min(1, p));
+                  const isActive = i === asset.current_gmm.label;
+                  return (
+                    <div key={i}>
+                      <div className="flex items-center justify-between font-mono text-[11px]">
+                        <span style={{ color: c }}>
+                          {["Bull", "Neutral", "Bear"][i]}
+                        </span>
+                        <span className="text-ink-muted">{fmtPct(p)}</span>
+                      </div>
+                      <div className="mt-0.5 h-1.5 w-full rounded bg-bg-ring">
+                        <div
+                          className="h-full rounded"
+                          style={{
+                            width: `${w * 100}%`,
+                            backgroundColor: c,
+                            opacity: isActive ? 1.0 : 0.55,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-[10px] leading-relaxed text-ink-dim">
+                3-state Gaussian HMM fit on (log-return, EWMA-vol). Unsupervised — states ranked by ascending variance. Agreement with the rule baseline = high confidence.
+              </p>
+            </div>
+
             <TvtpBand history={asset.history} />
 
             <TransitionHeatmap matrix={asset.transition_matrix} />

@@ -126,36 +126,38 @@ assert len(V2_FEATURE_ORDER) == 21
 #
 # Columns correspond to V2_FEATURE_ORDER.
 
-# Bull (0): strong positive momentum, low vol, shallow drawdown, risk-on macro
+# Bull (0): strong positive momentum-driven. Prioritise FRESH momentum over
+# "at-the-high" so recoveries from drawdowns flip to Bull quickly.
 _W_BULL = np.array([
-    # mom_5, mom_20, mom_63, mom_252
-    +0.05, +0.10, +0.10, +0.06,
+    # mom_5, mom_20, mom_63, mom_252 — short-horizon momentum dominates
+    +0.10, +0.14, +0.10, +0.05,
     # vol_short, vol_ewma, vol_long, vol_yearly
-    -0.08, -0.12, -0.07, -0.04,
+    -0.07, -0.10, -0.06, -0.03,
     # vol_ratio_sl, vol_ratio_ly
-    -0.05, -0.03,
+    -0.04, -0.02,
     # shock_z
-    -0.06,
-    # drawdown_252 (normed: 1=at high, 0=deepest DD — want high)
-    +0.13,
+    -0.05,
+    # drawdown_252 — reduced weight (DD recovers slowly post-crash)
+    +0.07,
     # autocorr_63
     0.0,
-    # trend_dir
-    +0.14,
+    # trend_dir — primary directional signal
+    +0.16,
     # vix_log, vix_change, vix_term
-    -0.07, -0.03, -0.04,
+    -0.06, -0.03, -0.03,
     # corr_tlt_63, corr_gld_63
-    -0.03, 0.0,
+    -0.02, 0.0,
     # term_spread
-    +0.04,
+    +0.03,
     # credit_spread
-    -0.05,
+    -0.04,
 ])
 
-# Neutral (1): sideways / mean-reverting, no directional edge
+# Neutral (1): sideways. Reduced autocorr weight — trending markets also
+# have positive autocorr, so high autocorr alone shouldn't beat momentum.
 _W_NEUTRAL = np.array([
-    # mom_5, mom_20, mom_63, mom_252
-    -0.02, -0.03, -0.02, 0.0,
+    # mom_5, mom_20, mom_63, mom_252 — penalise strong momentum
+    -0.04, -0.05, -0.03, 0.0,
     # vol_short, vol_ewma, vol_long, vol_yearly
     +0.03, +0.04, +0.03, 0.0,
     # vol_ratio_sl, vol_ratio_ly
@@ -164,10 +166,10 @@ _W_NEUTRAL = np.array([
     +0.02,
     # drawdown_252
     +0.02,
-    # high autocorr is Neutral's signature (mean-reverting chop)
-    +0.12,
-    # trend_dir — mildly penalise strong directional trend
-    -0.04,
+    # autocorr_63 — reduced from +0.12 so trending markets don't mistakenly fire Neutral
+    +0.05,
+    # trend_dir — penalise strong directional trend
+    -0.06,
     # vix_log, vix_change, vix_term
     +0.02, 0.0, +0.02,
     # corr_tlt_63, corr_gld_63
