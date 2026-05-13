@@ -17,7 +17,7 @@ import type { HistoryBar } from "@/lib/types";
 import {
   REGIME_COLORS,
   REGIME_NAMES,
-  activeLabelOfBar,
+  confirmedActiveLabel,
 } from "@/lib/types";
 
 function ticksEveryNth<T>(arr: T[], n: number): T[] {
@@ -34,9 +34,9 @@ function detectRegimeBands(history: HistoryBar[]): RegimeBand[] {
   if (history.length === 0) return [];
   const bands: RegimeBand[] = [];
   let curStart = history[0].date;
-  let curLabel = activeLabelOfBar(history[0]);
+  let curLabel = confirmedActiveLabel(history[0]);
   for (let i = 1; i < history.length; i++) {
-    const lbl = activeLabelOfBar(history[i]);
+    const lbl = confirmedActiveLabel(history[i]);
     if (lbl !== curLabel) {
       bands.push({ start: curStart, end: history[i].date, label: curLabel });
       curStart = history[i].date;
@@ -73,7 +73,7 @@ export default function RegimeTimelineChart({
   // Use argmax(probs) for the color and the label text so the marker matches
   // the probability stack instead of the (potentially stale) hard label.
   const lastBar = data[data.length - 1];
-  const lastActiveLabel = lastBar ? activeLabelOfBar(lastBar) : 2;
+  const lastActiveLabel = lastBar ? confirmedActiveLabel(lastBar) : 2;
   const lastColor = REGIME_COLORS[lastActiveLabel] ?? "#a3a3a3";
   const lastRegimeName = REGIME_NAMES[lastActiveLabel] ?? "—";
 
@@ -197,7 +197,7 @@ interface TipPayload {
 function RegimeTip(props: TipPayload) {
   if (!props.active || !props.payload || props.payload.length === 0) return null;
   const p = props.payload[0].payload;
-  const activeLabel = activeLabelOfBar(p);
+  const activeLabel = confirmedActiveLabel(p);
   const color = REGIME_COLORS[activeLabel] ?? "#a3a3a3";
   const name = REGIME_NAMES[activeLabel] ?? "—";
   return (

@@ -138,3 +138,70 @@ export function activeLabelOfBar(bar: {
 }): number {
   return activeRegimeFromProbs([bar.p0, bar.p1, bar.p2], bar.label);
 }
+
+// TVTP is a 2-state model: low-vol (Bull-ish) vs high-vol (Bear-ish).
+// p_high > 0.5 → vote Bear; p_low > 0.5 → vote Bull; otherwise → Neutral.
+function tvtpVote(tvtpLow: number | null, tvtpHigh: number | null): number {
+  if (tvtpHigh !== null && tvtpHigh > 0.5) return 2;
+  if (tvtpLow !== null && tvtpLow > 0.5) return 0;
+  return 1;
+}
+
+// Two-of-three confirmation: returns the regime that gets ≥2 votes across
+// (rule_argmax, gmm_label, tvtp_2state). Falls back to rule argmax when all
+// three disagree. Catches bear (or bull) shifts ~1 day earlier than the
+// rule baseline alone when two of the three models flip together.
+export function confirmedActiveLabel(bar: {
+  p0: number | null;
+  p1: number | null;
+  p2: number | null;
+  gmm_label: number;
+  tvtp_low: number | null;
+  tvtp_high: number | null;
+  label: number;
+}): number {
+  const vRule = activeRegimeFromProbs([bar.p0, bar.p1, bar.p2], bar.label);
+  const vGmm = bar.gmm_label;
+  const vTvtp = tvtpVote(bar.tvtp_low, bar.tvtp_high);
+  const counts = [0, 0, 0];
+  counts[vRule] += 1;
+  counts[vGmm] += 1;
+  counts[vTvtp] += 1;
+  let best = vRule;
+  let bestC = counts[vRule];
+  for (let c = 0; c < 3; c++) {
+    if (counts[c] >= 2 && counts[c] > bestC) {
+      best = c;
+      bestC = counts[c];
+    }
+  }
+  return best;
+}
+
+// Same 2-of-3 confirmation, but using the asset payload's "current" fields
+// (current_regime.probs, current_gmm.label, current_tvtp.{p_low_vol,p_high_vol}).
+export function confirmedActiveLabelFromAsset(asset: {
+  current_regime: { probs: (number | null)[]; label: number };
+  current_gmm: { label: number };
+  current_tvtp: { p_low_vol: number; p_high_vol: number };
+}): number {
+  const vRule = activeRegimeFromProbs(
+    asset.current_regime.probs,
+    asset.current_regime.label,
+  );
+  const vGmm = asset.current_gmm.label;
+  const vTvtp = tvtpVote(asset.current_tvtp.p_low_vol, asset.current_tvtp.p_high_vol);
+  const counts = [0, 0, 0];
+  counts[vRule] += 1;
+  counts[vGmm] += 1;
+  counts[vTvtp] += 1;
+  let best = vRule;
+  let bestC = counts[vRule];
+  for (let c = 0; c < 3; c++) {
+    if (counts[c] >= 2 && counts[c] > bestC) {
+      best = c;
+      bestC = counts[c];
+    }
+  }
+  return best;
+}

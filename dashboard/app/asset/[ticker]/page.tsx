@@ -12,7 +12,7 @@ import {
   REGIME_ALLOC,
   REGIME_COLORS,
   REGIME_NAMES,
-  activeRegimeFromProbs,
+  confirmedActiveLabelFromAsset,
 } from "@/lib/types";
 
 export const dynamicParams = false;
@@ -56,13 +56,11 @@ export default async function AssetPage({
   const tvtpPos = asset.current_tvtp.position;
   const tvtpColor = tvtpPos >= 0 ? "#22c55e" : "#ef4444";
 
-  // Derive the displayed regime from argmax(probs) instead of the stored hard
-  // label — the rule-baseline can flag Bear while P(Bull)=64% (see screenshot
-  // 2026-05-12). Display layer trusts what the probabilities actually say.
-  const activeLabel = activeRegimeFromProbs(
-    asset.current_regime.probs,
-    asset.current_regime.label,
-  );
+  // 2-of-3 confirmation across rule-baseline argmax, GMM label, and TVTP
+  // 2-state. Flips ~1 day earlier than rule-baseline alone when two of the
+  // three models agree first, while needing two votes to switch keeps
+  // whipsaw modest.
+  const activeLabel = confirmedActiveLabelFromAsset(asset);
   const activeName = REGIME_NAMES[activeLabel];
   const activeAlloc = REGIME_ALLOC[activeLabel];
 
