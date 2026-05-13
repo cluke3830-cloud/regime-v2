@@ -3,7 +3,7 @@
 Critical tests:
   - Causal hygiene on v2 (perturb future aux data → features at earlier
     indices unchanged).
-  - All 23 columns (v1 + 9 Tier-2) present when all aux data provided.
+  - All 27 columns (v1 + 13 Tier-2) present when all aux data provided.
   - Graceful degradation when aux series are None — feature column
     becomes constant 0, frame survives.
   - Aux-data alignment: VIX/FRED series with a different (sparser)
@@ -78,6 +78,23 @@ def _make_aux_bundle(close_index: pd.DatetimeIndex, seed: int = 1) -> dict:
         2.0 + np.cumsum(rng.standard_normal(n) * 0.01),
         index=close_index, name="credit_spread",
     )
+    # Extended VIX term structure + options signals (synthetic, plausible levels)
+    bundle["vix6m"] = pd.Series(
+        np.exp(np.log(20) + 0.04 * np.cumsum(rng.standard_normal(n) * 0.07)),
+        index=close_index, name="vix6m",
+    )
+    bundle["vix9d"] = pd.Series(
+        np.exp(np.log(17) + 0.12 * np.cumsum(rng.standard_normal(n) * 0.12)),
+        index=close_index, name="vix9d",
+    )
+    bundle["skew"] = pd.Series(
+        130 + np.cumsum(rng.standard_normal(n) * 0.3),
+        index=close_index, name="skew",
+    )
+    bundle["vvix"] = pd.Series(
+        np.exp(np.log(85) + 0.08 * np.cumsum(rng.standard_normal(n) * 0.1)),
+        index=close_index, name="vvix",
+    )
     return bundle
 
 
@@ -86,16 +103,19 @@ def _make_aux_bundle(close_index: pd.DatetimeIndex, seed: int = 1) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_v2_full_bundle_has_all_23_features():
-    """v2 schema: 14 Tier-1 + 9 Tier-2 (5 VIX/macro + 2 cross-asset corrs +
-    yang_zhang_vol + vix_slope) = 23.
+def test_v2_full_bundle_has_all_27_features():
+    """v2 schema: 14 Tier-1 + 13 Tier-2 = 27.
+
+    Tier-2 = 4 VIX core (log/change/term/slope) + 2 extended-term (curvature/6m_slope)
+        + 2 options (skew_log/vvix_log) + 2 cross-asset (corr_tlt/gld_63)
+        + 2 FRED (term/credit spread) + 1 yang_zhang_vol = 13.
     """
     close = _gbm(n=600)
     aux = _make_aux_bundle(close.index)
     f = compute_features_v2(close, **aux)
     for col in NON_FEATURE_COLUMNS + FEATURE_COLUMNS_V2:
         assert col in f.columns, f"missing column: {col}"
-    assert len(FEATURE_COLUMNS_V2) == 23
+    assert len(FEATURE_COLUMNS_V2) == 27
 
 
 def test_v2_v1_subset_matches_v1():

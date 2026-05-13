@@ -101,7 +101,8 @@ def _build_feature_fn_v2():
         cache_dir=CACHE_DIR,
         fred_api_key=os.environ.get("FRED_API_KEY"),
     )
-    for name in ("vix", "vix3m", "tlt", "gld", "term_spread", "credit_spread"):
+    for name in ("vix", "vix3m", "vix6m", "vix9d", "skew", "vvix",
+                 "tlt", "gld", "term_spread", "credit_spread"):
         s = bundle.get(name)
         if s is None:
             err = bundle.get(f"_{name}_error", "unknown error")
@@ -265,6 +266,12 @@ def main() -> int:
         ),
         alpha=0.10, gamma=0.005, window=500,
     )
+    # Multi-model log-opinion-pool — fuses GMM-HMM + TVTP-MSAR via an
+    # empirical TVTP→3-class mapping learned from rule_baseline label
+    # frequencies in the training fold. Tests the fused regime signal
+    # as an actual strategy rather than a dashboard artefact.
+    from src.strategies.fusion import make_fusion_strategy  # noqa: PLC0415
+    fusion = make_fusion_strategy()
 
     strategies = {
         "flat": flat,
@@ -282,6 +289,7 @@ def main() -> int:
         "ms_garch": ms_garch,                      # Brief 3.3
         "patchtst": patchtst,                      # Brief 4.1
         "conformal_xgb": conformal_xgb,            # Brief 4.2
+        "fusion": fusion,                          # log-opinion-pool of GMM + TVTP
     }
     # Real cost model (SPY-specific bps + Amihud volume adjustment) and
     # portfolio risk controls (15% DD circuit-breaker + 95% VaR ≤ 2% NAV).

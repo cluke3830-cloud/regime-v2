@@ -208,6 +208,10 @@ def fetch_aux_data_bundle(
         Keys (any of which may be missing if a fetch failed):
           - ``vix``           : pd.Series (^VIX close)
           - ``vix3m``         : pd.Series (^VIX3M close)
+          - ``vix6m``         : pd.Series (^VIX6M close)
+          - ``vix9d``         : pd.Series (^VIX9D close)
+          - ``skew``          : pd.Series (^SKEW close — CBOE tail-risk index)
+          - ``vvix``          : pd.Series (^VVIX close — vol of VIX)
           - ``tlt``           : pd.Series (TLT close)
           - ``gld``           : pd.Series (GLD close)
           - ``term_spread``   : pd.Series (T10Y2Y from FRED)
@@ -224,6 +228,15 @@ def fetch_aux_data_bundle(
         ("vix3m", lambda: fetch_vix3m(start, end, cache_dir=cache_dir)),
         ("tlt",   lambda: fetch_yf_close("TLT", start, end, cache_dir=cache_dir)),
         ("gld",   lambda: fetch_yf_close("GLD", start, end, cache_dir=cache_dir)),
+        # ---- Options-derived signals (CBOE-published, free via yfinance)
+        # SKEW: tail-risk premium (CBOE SKEW Index, ticker ^SKEW)
+        # VVIX: vol-of-vol (CBOE VVIX Index, ticker ^VVIX)
+        # VIX6M: 6-month forward implied vol (ticker ^VIX6M)
+        # VIX9D: 9-day implied vol (ticker ^VIX9D) — front-end panic signal
+        ("skew",  lambda: fetch_yf_close("^SKEW",  start, end, cache_dir=cache_dir)),
+        ("vvix",  lambda: fetch_yf_close("^VVIX",  start, end, cache_dir=cache_dir)),
+        ("vix6m", lambda: fetch_yf_close("^VIX6M", start, end, cache_dir=cache_dir)),
+        ("vix9d", lambda: fetch_yf_close("^VIX9D", start, end, cache_dir=cache_dir)),
     ]:
         try:
             bundle[name] = fn()

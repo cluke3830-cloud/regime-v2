@@ -144,29 +144,24 @@ def _compute_tvtp_probs(
 def _log_opinion_pool(
     gmm_proba: np.ndarray,
     tvtp_proba: np.ndarray,
+    mapping: np.ndarray | None = None,
     eps: float = 1e-9,
 ) -> np.ndarray:
     """Combine GMM-HMM (3-state) + TVTP-MSAR (2→3-mapped) into a single posterior.
 
-    Log-opinion-pool: p_fused ∝ exp(log p_gmm + log p_tvtp_3class).
-    When models agree, the fused distribution sharpens. When they disagree,
-    it flattens — which is exactly what we want a "consensus" probability
-    to do. The entropy of the fused distribution is then a natural
-    uncertainty measure (high entropy = low confidence).
+    The TVTP→3-class mapping is learned from rule_baseline label frequencies
+    on the same series (see ``src.strategies.fusion.empirical_tvtp_3class_mapping``),
+    replacing the old hardcoded 70/30 prior. If no mapping is passed, the
+    prior is used as a fallback.
 
-    TVTP→3-class mapping: low-vol regime is split 70% Bull / 30% Neutral
-    (low-vol days are mostly bull but include some sideways), high-vol
-    regime maps entirely to Bear.
+    Log-opinion-pool: p_fused ∝ exp(log p_gmm + log p_tvtp_3class). Agreement
+    sharpens the posterior; disagreement flattens it. The Shannon entropy
+    of the fused distribution serves as a natural uncertainty signal.
     """
-    tvtp_3 = np.column_stack([
-        tvtp_proba[:, 0] * 0.7,   # low-vol → Bull
-        tvtp_proba[:, 0] * 0.3,   # low-vol → Neutral
-        tvtp_proba[:, 1],          # high-vol → Bear
-    ])
-    log_pool = np.log(gmm_proba + eps) + np.log(tvtp_3 + eps)
-    log_pool -= log_pool.max(axis=1, keepdims=True)
-    pool = np.exp(log_pool)
-    return pool / pool.sum(axis=1, keepdims=True)
+    from src.strategies.fusion import apply_log_opinion_pool, _PRIOR_TVTP_MAPPING
+    if mapping is None:
+        mapping = _PRIOR_TVTP_MAPPING
+    return apply_log_opinion_pool(gmm_proba, tvtp_proba, mapping, eps=eps)
 
 
 def _build_asset_payload(
@@ -179,6 +174,10 @@ def _build_asset_payload(
         close,
         vix=aux_bundle.get("vix"),
         vix3m=aux_bundle.get("vix3m"),
+        vix6m=aux_bundle.get("vix6m"),
+        vix9d=aux_bundle.get("vix9d"),
+        skew=aux_bundle.get("skew"),
+        vvix=aux_bundle.get("vvix"),
         tlt=aux_bundle.get("tlt"),
         gld=aux_bundle.get("gld"),
         term_spread=aux_bundle.get("term_spread"),
@@ -217,12 +216,18 @@ def _build_asset_payload(
         aligned["gmm_label"] = 1
 
     # ------------------------------------------------------------------
-    # Multi-model fusion (log-opinion-pool of GMM + TVTP)
+    # Multi-model fusion (log-opinion-pool of GMM + TVTP) with empirical
+    # mapping learned from rule_baseline label frequencies on this series.
     # ------------------------------------------------------------------
     if tvtp is not None and gmm is not None:
+        from src.strategies.fusion import empirical_tvtp_3class_mapping
+        mapping = empirical_tvtp_3class_mapping(
+            tvtp[["p_low_vol", "p_high_vol"]],
+            rule_seq["label"],
+        )
         gmm_arr = aligned[["gmm_p0", "gmm_p1", "gmm_p2"]].fillna(1.0 / 3).to_numpy()
         tvtp_arr = aligned[["tvtp_low_vol", "tvtp_high_vol"]].fillna(0.5).to_numpy()
-        fused = _log_opinion_pool(gmm_arr, tvtp_arr)
+        fused = _log_opinion_pool(gmm_arr, tvtp_arr, mapping=mapping)
         aligned["fusion_p0"] = fused[:, 0]
         aligned["fusion_p1"] = fused[:, 1]
         aligned["fusion_p2"] = fused[:, 2]

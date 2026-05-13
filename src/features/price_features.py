@@ -72,6 +72,10 @@ FEATURE_COLUMNS_V2_ADD: list[str] = [
     "vix_change",     # 5-day change in VIX (acceleration signal)
     "vix_term",       # VIX / VIX3M — backwardation > 1 = stress
     "vix_slope",      # VIX3M - VIX — contango>0 (calm), backwardation<0 (stress)
+    "vix_curvature",  # 2*VIX - VIX9D - VIX3M — convexity of front-month term
+    "vix6m_slope",    # VIX6M - VIX — long-horizon term structure
+    "skew_log",       # log(SKEW) — tail-risk premium from S&P option chain
+    "vvix_log",       # log(VVIX) — vol-of-vol; rises before stress moves
     "corr_tlt_63",    # 63-bar rolling Pearson corr(asset, TLT)
     "corr_gld_63",    # 63-bar rolling Pearson corr(asset, GLD)
     "term_spread",    # T10Y2Y from FRED — yield curve
@@ -180,6 +184,10 @@ def compute_features_v2(
     ohlc: Optional["pd.DataFrame"] = None,
     vix: Optional[pd.Series] = None,
     vix3m: Optional[pd.Series] = None,
+    vix6m: Optional[pd.Series] = None,
+    vix9d: Optional[pd.Series] = None,
+    skew: Optional[pd.Series] = None,
+    vvix: Optional[pd.Series] = None,
     tlt: Optional[pd.Series] = None,
     gld: Optional[pd.Series] = None,
     term_spread: Optional[pd.Series] = None,
@@ -277,6 +285,37 @@ def compute_features_v2(
     else:
         f["vix_term"] = np.nan
         f["vix_slope"] = np.nan
+
+    # ---- Tier-2: Extended VIX term structure (VIX9D + VIX6M)
+    # Curvature = 2*VIX - VIX9D - VIX3M (convexity of the front-month curve).
+    # Positive = curve is concave (humped) — typical pre-stress shape.
+    if vix is not None and vix9d is not None and vix3m is not None:
+        vix_a = vix.reindex(close.index).ffill()
+        vix9d_a = vix9d.reindex(close.index).ffill()
+        vix3m_a = vix3m.reindex(close.index).ffill()
+        f["vix_curvature"] = (2 * vix_a - vix9d_a - vix3m_a).shift(1)
+    else:
+        f["vix_curvature"] = np.nan
+
+    if vix is not None and vix6m is not None:
+        vix_a = vix.reindex(close.index).ffill()
+        vix6m_a = vix6m.reindex(close.index).ffill()
+        f["vix6m_slope"] = (vix6m_a - vix_a).shift(1)
+    else:
+        f["vix6m_slope"] = np.nan
+
+    # ---- Tier-2: SKEW (tail-risk premium) + VVIX (vol-of-vol)
+    if skew is not None:
+        skew_aligned = skew.reindex(close.index).ffill()
+        f["skew_log"] = np.log(skew_aligned.clip(lower=1e-9)).shift(1)
+    else:
+        f["skew_log"] = np.nan
+
+    if vvix is not None:
+        vvix_aligned = vvix.reindex(close.index).ffill()
+        f["vvix_log"] = np.log(vvix_aligned.clip(lower=1e-9)).shift(1)
+    else:
+        f["vvix_log"] = np.nan
 
     # ---- Tier-2: Cross-asset rolling correlations
     asset_ret = log_ret

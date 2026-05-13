@@ -20,8 +20,9 @@ Main strategies in ``scripts/make_validation_report.py``:
     meta_equal, meta_ridge,
     transition_gated,
     tvtp_msar, hsmm, ms_garch,
-    patchtst, conformal_xgb
-        → 15 named strategies (1 trial each)
+    patchtst, conformal_xgb,
+    fusion (log-opinion-pool of GMM-HMM + TVTP-MSAR with empirical mapping)
+        → 16 named strategies (1 trial each)
 
 Multi-asset robustness: the winning strategy is re-evaluated on
 ``DEFAULT_UNIVERSE`` (10 tickers). Each ticker is a separate trial
@@ -34,7 +35,7 @@ Hyperparameter sweeps already absorbed into the named variants:
     Audit-conservative accounting counts every combo as a separate trial.
         → 36 grid combos
 
-Subtotal: 15 + 10 + 36 = 61.
+Subtotal: 16 + 10 + 36 = 62.
 Audit safety margin (informal pre-registration drift, exploratory runs
 during Brief 1–4 development, prior dashboard iterations): round to 200.
 
@@ -62,6 +63,7 @@ STRATEGY_REGISTRY: tuple[str, ...] = (
     "ms_garch",
     "patchtst",
     "conformal_xgb",
+    "fusion",
 )
 
 # Multi-asset robustness universe (DEFAULT_UNIVERSE in
