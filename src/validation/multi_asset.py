@@ -87,6 +87,7 @@ def default_feature_fn(
 
 def make_feature_fn_v2(
     aux_bundle: dict,
+    ohlc: Optional[pd.DataFrame] = None,
 ) -> Callable[[pd.Series], Tuple[pd.DataFrame, pd.Series]]:
     """Build a feature_fn that closes over a pre-fetched aux bundle.
 
@@ -111,8 +112,13 @@ def make_feature_fn_v2(
     """
 
     def feature_fn_v2(close: pd.Series) -> Tuple[pd.DataFrame, pd.Series]:
+        # OHLC only attaches if its index matches close (i.e. same ticker as
+        # the one ohlc was fetched for). Mismatched-index assets get None →
+        # yang_zhang_vol degrades to NaN → constant zero column.
+        local_ohlc = ohlc if (ohlc is not None and len(ohlc.index.intersection(close.index)) > 0.9 * len(close)) else None
         features = compute_features_v2(
             close,
+            ohlc=local_ohlc,
             vix=aux_bundle.get("vix"),
             vix3m=aux_bundle.get("vix3m"),
             tlt=aux_bundle.get("tlt"),

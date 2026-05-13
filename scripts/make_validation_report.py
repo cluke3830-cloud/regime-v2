@@ -81,7 +81,9 @@ from src.validation.strategy_registry import N_TRIALS_REGISTERED  # noqa: E402
 
 
 CACHE_DIR = ROOT / "data" / "cache"
-START = "2015-01-01"
+# Extended to 2000 to include 2000-02 dot-com and 2008 GFC — the two canonical
+# Bear stress tests missing from the 2015+ window.
+START = "2000-01-01"
 END = "2025-01-01"
 
 
@@ -107,7 +109,24 @@ def _build_feature_fn_v2():
         else:
             print(f"      ✓ {name}: {len(s)} obs  "
                   f"[{s.index.min().date()} → {s.index.max().date()}]")
-    return make_feature_fn_v2(bundle), bundle
+
+    # SPY OHLC for Yang-Zhang volatility. Only attached to the primary asset
+    # (SPY); multi-asset robustness loop sees ohlc=None and degrades gracefully.
+    spy_ohlc = None
+    try:
+        import yfinance as yf  # noqa: PLC0415
+        _raw = yf.download("SPY", start=START, end=END, progress=False, auto_adjust=True)
+        # yfinance occasionally returns a MultiIndex on .columns; flatten it.
+        if hasattr(_raw.columns, "nlevels") and _raw.columns.nlevels > 1:
+            _raw.columns = [c[0] for c in _raw.columns]
+        spy_ohlc = _raw[["Open", "High", "Low", "Close"]].rename(
+            columns={"Open": "open", "High": "high", "Low": "low", "Close": "close"}
+        )
+        print(f"      ✓ SPY OHLC: {len(spy_ohlc)} bars (for Yang-Zhang vol)")
+    except Exception as exc:
+        print(f"      ⚠️  SPY OHLC fetch failed ({exc}); Yang-Zhang vol degrades to 0.")
+
+    return make_feature_fn_v2(bundle, ohlc=spy_ohlc), bundle
 
 
 def main() -> int:
@@ -345,17 +364,125 @@ def main() -> int:
     print(f"      → soft gate (≥70% positive AND mean>0): "
           f"{'PASS' if summary['passes_gate'] else 'FAIL'}")
 
-    print("[6/6] Writing validation_report.md ...", flush=True)
+    print("[6/6] Computing regime diagnostics (NBER / ECE / stability / "
+          "concordance / BIC-AIC) ...", flush=True)
+    diagnostics_md = _compute_diagnostics_section(close, features)
+
+    print("[7/7] Writing validation_report.md ...", flush=True)
     out = emit_markdown_report(
         reports,
         ROOT / "validation_report.md",
         label_balance=label_balance,
         multi_asset_results=multi_results,
         title=f"CPCV Validation Report — Phase 1 + Phase 2.1 XGBoost "
-              f"(SPY 2015-2024, robustness on '{winner_name}')",
+              f"(SPY {START[:4]}-{END[:4]}, robustness on '{winner_name}')",
     )
+    # Append diagnostics section to the same file
+    with open(out, "a", encoding="utf-8") as f:
+        f.write("\n\n")
+        f.write(diagnostics_md)
     print(f"      Report written: {out}")
     return 0
+
+
+def _compute_diagnostics_section(close: pd.Series, features: pd.DataFrame) -> str:
+    """Run all four regime diagnostics + BIC/AIC sweep, return markdown string."""
+    import os
+    from src.regime.rule_baseline import compute_rule_regime_sequence
+    from src.regime.gmm_hmm import compute_gmm_hmm_sequence, select_hmm_k
+    from src.baselines.tvtp_msar import MarkovSwitchingAR
+    from src.validation.regime_diagnostics import (
+        nber_alignment, reliability_diagram, regime_stability,
+        cross_model_concordance,
+    )
+
+    lines = ["## Regime Diagnostics\n"]
+
+    # Run all three models on the full series
+    rule_seq = compute_rule_regime_sequence(features)
+    gmm = compute_gmm_hmm_sequence(close)
+    returns = np.log(close).diff().dropna()
+    cut = int(len(returns) * 0.7)
+    tvtp_model = MarkovSwitchingAR(k_regimes=2, order=1, switching_variance=True)
+    tvtp_model.fit(returns.iloc[:cut])
+    tvtp_probs = tvtp_model.predict_proba(returns) if tvtp_model.params_ is not None else None
+
+    # ---- BIC/AIC across K
+    lines.append("### Model selection — BIC/AIC across K\n")
+    k_results = select_hmm_k(close, k_range=(2, 5))
+    if k_results:
+        lines.append("| K | log-likelihood | n_params | AIC | BIC |")
+        lines.append("|---:|---:|---:|---:|---:|")
+        for k, r in sorted(k_results.items()):
+            lines.append(f"| {k} | {r['log_likelihood']} | {r['n_params']} "
+                         f"| {r['aic']} | {r['bic']} |")
+        best_bic_k = min(k_results, key=lambda k: k_results[k]["bic"])
+        best_aic_k = min(k_results, key=lambda k: k_results[k]["aic"])
+        lines.append(f"\n**Best K by BIC: {best_bic_k}**, **best K by AIC: {best_aic_k}**.\n")
+    else:
+        lines.append("_GMM-HMM K-selection failed (insufficient data?)._\n")
+
+    # ---- NBER alignment (rule_baseline labels)
+    lines.append("\n### NBER recession alignment (rule_baseline Bear vs USREC)\n")
+    nber = nber_alignment(rule_seq["label"], fred_api_key=os.environ.get("FRED_API_KEY"))
+    if nber.get("usrec_available"):
+        lines.append(f"- Precision (Bear bars in NBER recession): **{nber['precision']:.1%}**")
+        lines.append(f"- Recall (NBER recession bars labeled Bear): **{nber['recall']:.1%}**")
+        lines.append(f"- F1: **{nber['f1']:.2f}**")
+        lines.append(f"- Median lag from recession start to first Bear: "
+                     f"**{nber['median_days_to_bear']} days**")
+        lines.append(f"- Sample: {nber['n_recession_bars']} recession bars, "
+                     f"{nber['n_bear_bars']} Bear bars, {nber['n_overlap']} overlap.")
+    else:
+        lines.append(f"_NBER fetch unavailable: {nber.get('error', 'no FRED_API_KEY?')}_\n")
+
+    # ---- Regime stability
+    lines.append("\n### Regime stability (rule_baseline)\n")
+    stab = regime_stability(rule_seq["label"])
+    lines.append(f"- Global flip rate: **{stab['flip_rate']:.3f}** "
+                 f"(transitions per bar — `< 0.05` is healthy)")
+    lines.append(f"- Dominant regime: **{stab['dominant_regime']}**")
+    lines.append("\n| Regime | Mean duration (bars) | Median | # episodes | % time |")
+    lines.append("|---:|---:|---:|---:|---:|")
+    for lbl, s in sorted(stab["per_regime"].items()):
+        lines.append(f"| {lbl} | {s['mean_duration_bars']} | "
+                     f"{s['median_duration_bars']} | {s['n_episodes']} | "
+                     f"{s['pct_time']:.1%} |")
+
+    # ---- Calibration (GMM-HMM probs vs rule_baseline labels)
+    lines.append("\n### Calibration — Expected Calibration Error\n")
+    if gmm is not None:
+        gmm_aligned = gmm.reindex(rule_seq.index).dropna()
+        ref = rule_seq.loc[gmm_aligned.index, "label"].to_numpy()
+        proba = gmm_aligned[["p_0", "p_1", "p_2"]].to_numpy()
+        cal = reliability_diagram(proba, ref, n_bins=10)
+        lines.append(f"- GMM-HMM mean ECE (vs rule_baseline labels): "
+                     f"**{cal['mean_ece']:.3f}**")
+        lines.append(f"- Per-class ECE: {cal['ece_per_class']}")
+        lines.append("(0 = perfectly calibrated; < 0.05 is well-calibrated; "
+                     "> 0.10 indicates systematic over/under-confidence.)")
+    else:
+        lines.append("_GMM-HMM fit failed; calibration skipped._\n")
+
+    # ---- Cross-model concordance
+    lines.append("\n### Cross-model concordance\n")
+    if gmm is not None and tvtp_probs is not None:
+        conc = cross_model_concordance(rule_seq["label"], gmm["label"], tvtp_probs)
+        lines.append(f"- Rule vs GMM exact agreement: **{conc['rule_gmm_agreement']:.1%}**")
+        lines.append(f"- Rule vs TVTP (Bear vs non-Bear): **{conc['rule_tvtp_agreement']:.1%}**")
+        lines.append(f"- GMM vs TVTP (Bear vs non-Bear): **{conc['gmm_tvtp_agreement']:.1%}**")
+        lines.append(f"- **Consensus score (≥2 of 3 agree): "
+                     f"{conc['consensus_score']:.1%}**")
+        lines.append(f"- Cohen's κ (rule, GMM): **{conc['cohen_kappa_rule_gmm']:.3f}**")
+        lines.append("\nConfusion matrix (row=rule, col=GMM, labels 0/1/2):\n")
+        lines.append("| | gmm=0 | gmm=1 | gmm=2 |")
+        lines.append("|---:|---:|---:|---:|")
+        for i, row in enumerate(conc["confusion_rule_gmm"]):
+            lines.append(f"| **rule={i}** | {row[0]} | {row[1]} | {row[2]} |")
+    else:
+        lines.append("_GMM or TVTP fit failed; concordance skipped._\n")
+
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":

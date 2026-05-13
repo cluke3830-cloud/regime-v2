@@ -71,10 +71,12 @@ FEATURE_COLUMNS_V2_ADD: list[str] = [
     "vix_log",        # log(VIX) — fear gauge level
     "vix_change",     # 5-day change in VIX (acceleration signal)
     "vix_term",       # VIX / VIX3M — backwardation > 1 = stress
+    "vix_slope",      # VIX3M - VIX — contango>0 (calm), backwardation<0 (stress)
     "corr_tlt_63",    # 63-bar rolling Pearson corr(asset, TLT)
     "corr_gld_63",    # 63-bar rolling Pearson corr(asset, GLD)
     "term_spread",    # T10Y2Y from FRED — yield curve
     "credit_spread",  # BAA10Y from FRED — credit risk premium
+    "yang_zhang_vol", # Yang-Zhang (2000) vol from daily OHLC (20-bar window)
 ]
 
 FEATURE_COLUMNS_V2: list[str] = FEATURE_COLUMNS_V1 + FEATURE_COLUMNS_V2_ADD
@@ -175,6 +177,7 @@ def compute_features_v1(close: pd.Series) -> pd.DataFrame:
 def compute_features_v2(
     close: pd.Series,
     *,
+    ohlc: Optional["pd.DataFrame"] = None,
     vix: Optional[pd.Series] = None,
     vix3m: Optional[pd.Series] = None,
     tlt: Optional[pd.Series] = None,
@@ -244,6 +247,14 @@ def compute_features_v2(
     ma_long  = close.rolling(63).mean()
     f["trend_dir"] = (ma_short / ma_long - 1).shift(1)
 
+    # ---- Tier-2: Yang-Zhang volatility (from daily OHLC, more accurate than EWMA)
+    if ohlc is not None:
+        from src.features.intraday_rv import compute_yang_zhang_vol
+        yz = compute_yang_zhang_vol(ohlc, window=20).reindex(close.index).ffill()
+        f["yang_zhang_vol"] = yz.shift(1)
+    else:
+        f["yang_zhang_vol"] = np.nan
+
     # ---- Tier-2: VIX features
     if vix is not None:
         vix_aligned = vix.reindex(close.index).ffill()
@@ -261,8 +272,11 @@ def compute_features_v2(
         vix3m_aligned = vix3m.reindex(close.index).ffill()
         # Backwardation (vix_term > 1) is the canonical stress signal.
         f["vix_term"] = (vix_aligned / vix3m_aligned.replace(0, np.nan)).shift(1)
+        # Additive slope: positive = contango (calm), negative = backwardation (stress).
+        f["vix_slope"] = (vix3m_aligned - vix_aligned).shift(1)
     else:
         f["vix_term"] = np.nan
+        f["vix_slope"] = np.nan
 
     # ---- Tier-2: Cross-asset rolling correlations
     asset_ret = log_ret

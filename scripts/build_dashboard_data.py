@@ -141,6 +141,34 @@ def _compute_tvtp_probs(
     return probs
 
 
+def _log_opinion_pool(
+    gmm_proba: np.ndarray,
+    tvtp_proba: np.ndarray,
+    eps: float = 1e-9,
+) -> np.ndarray:
+    """Combine GMM-HMM (3-state) + TVTP-MSAR (2→3-mapped) into a single posterior.
+
+    Log-opinion-pool: p_fused ∝ exp(log p_gmm + log p_tvtp_3class).
+    When models agree, the fused distribution sharpens. When they disagree,
+    it flattens — which is exactly what we want a "consensus" probability
+    to do. The entropy of the fused distribution is then a natural
+    uncertainty measure (high entropy = low confidence).
+
+    TVTP→3-class mapping: low-vol regime is split 70% Bull / 30% Neutral
+    (low-vol days are mostly bull but include some sideways), high-vol
+    regime maps entirely to Bear.
+    """
+    tvtp_3 = np.column_stack([
+        tvtp_proba[:, 0] * 0.7,   # low-vol → Bull
+        tvtp_proba[:, 0] * 0.3,   # low-vol → Neutral
+        tvtp_proba[:, 1],          # high-vol → Bear
+    ])
+    log_pool = np.log(gmm_proba + eps) + np.log(tvtp_3 + eps)
+    log_pool -= log_pool.max(axis=1, keepdims=True)
+    pool = np.exp(log_pool)
+    return pool / pool.sum(axis=1, keepdims=True)
+
+
 def _build_asset_payload(
     ticker: str, close: pd.Series, aux_bundle: dict
 ) -> Dict[str, Any]:
@@ -187,6 +215,28 @@ def _build_asset_payload(
         aligned["gmm_p1"] = np.nan
         aligned["gmm_p2"] = np.nan
         aligned["gmm_label"] = 1
+
+    # ------------------------------------------------------------------
+    # Multi-model fusion (log-opinion-pool of GMM + TVTP)
+    # ------------------------------------------------------------------
+    if tvtp is not None and gmm is not None:
+        gmm_arr = aligned[["gmm_p0", "gmm_p1", "gmm_p2"]].fillna(1.0 / 3).to_numpy()
+        tvtp_arr = aligned[["tvtp_low_vol", "tvtp_high_vol"]].fillna(0.5).to_numpy()
+        fused = _log_opinion_pool(gmm_arr, tvtp_arr)
+        aligned["fusion_p0"] = fused[:, 0]
+        aligned["fusion_p1"] = fused[:, 1]
+        aligned["fusion_p2"] = fused[:, 2]
+        aligned["fusion_label"] = fused.argmax(axis=1).astype(int)
+        # Shannon entropy normalised by log(K=3)
+        eps = 1e-12
+        h = -(fused * np.log(fused + eps)).sum(axis=1)
+        aligned["fusion_entropy"] = h / np.log(3)
+    else:
+        aligned["fusion_p0"] = np.nan
+        aligned["fusion_p1"] = np.nan
+        aligned["fusion_p2"] = np.nan
+        aligned["fusion_label"] = 1
+        aligned["fusion_entropy"] = np.nan
 
     # ------------------------------------------------------------------
     # Walk-forward equity curves (each at unit notional, t-1 signal → t return)
@@ -236,6 +286,11 @@ def _build_asset_payload(
             "tvtp_low":  _finite(row["tvtp_low_vol"]),
             "tvtp_high": _finite(row["tvtp_high_vol"]),
             "tvtp_pos":  _finite(row["tvtp_position"]),
+            "fusion_label": int(row["fusion_label"]),
+            "fusion_p0": _finite(row["fusion_p0"]),
+            "fusion_p1": _finite(row["fusion_p1"]),
+            "fusion_p2": _finite(row["fusion_p2"]),
+            "fusion_entropy": _finite(row["fusion_entropy"]),
             "eq_tvtp":  _finite(tail_tvtp_eq.get(ts, np.nan)),
             "eq_rule":  _finite(tail_rule_eq.get(ts, np.nan)),
             "eq_bh":    _finite(tail_bh_eq.get(ts, np.nan)),
@@ -284,6 +339,16 @@ def _build_asset_payload(
             "label": last_gmm_label,
             "name":  GMM_STATE_NAMES.get(last_gmm_label, "—"),
             "probs": last_gmm_probs,
+        },
+        "current_fusion": {
+            "label": int(last.get("fusion_label", 1)),
+            "name":  REGIME_NAMES[int(last.get("fusion_label", 1))],
+            "probs": [
+                _finite(last.get("fusion_p0")),
+                _finite(last.get("fusion_p1")),
+                _finite(last.get("fusion_p2")),
+            ],
+            "entropy": _finite(last.get("fusion_entropy")),
         },
         "stats": ASSET_BACKTEST_STATS.get(ticker, {}),
         "transition_matrix": transition_matrix,

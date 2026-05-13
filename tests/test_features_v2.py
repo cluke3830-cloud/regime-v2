@@ -3,7 +3,7 @@
 Critical tests:
   - Causal hygiene on v2 (perturb future aux data → features at earlier
     indices unchanged).
-  - All 21 columns (v1 + 7 Tier-2) present when all aux data provided.
+  - All 23 columns (v1 + 9 Tier-2) present when all aux data provided.
   - Graceful degradation when aux series are None — feature column
     becomes constant 0, frame survives.
   - Aux-data alignment: VIX/FRED series with a different (sparser)
@@ -86,13 +86,16 @@ def _make_aux_bundle(close_index: pd.DatetimeIndex, seed: int = 1) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_v2_full_bundle_has_all_21_features():
+def test_v2_full_bundle_has_all_23_features():
+    """v2 schema: 14 Tier-1 + 9 Tier-2 (5 VIX/macro + 2 cross-asset corrs +
+    yang_zhang_vol + vix_slope) = 23.
+    """
     close = _gbm(n=600)
     aux = _make_aux_bundle(close.index)
     f = compute_features_v2(close, **aux)
     for col in NON_FEATURE_COLUMNS + FEATURE_COLUMNS_V2:
         assert col in f.columns, f"missing column: {col}"
-    assert len(FEATURE_COLUMNS_V2) == 21
+    assert len(FEATURE_COLUMNS_V2) == 23
 
 
 def test_v2_v1_subset_matches_v1():

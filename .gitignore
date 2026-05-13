@@ -78,3 +78,6 @@ data/cache/
 
 # Plan / scratch artefacts (live in ~/.claude/)
 plans/
+.vercel/
+Regime_v2_Bibliography.docx
+generate_references.py

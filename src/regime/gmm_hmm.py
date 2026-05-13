@@ -142,9 +142,79 @@ def compute_gmm_hmm_sequence(
     return out
 
 
+def select_hmm_k(
+    close: pd.Series,
+    k_range: tuple[int, int] = (2, 5),
+    n_iter: int = 200,
+    seed: int = 42,
+) -> dict[int, dict]:
+    """Fit GaussianHMM for K = k_range[0] .. k_range[1] and return BIC/AIC per K.
+
+    Justifies (or refutes) the K=3 assumption by letting the information
+    criterion pick the optimal number of states from the data.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Asset close prices.
+    k_range : (int, int)
+        Inclusive range of K values to evaluate.
+    n_iter, seed : int
+        Passed to GaussianHMM.
+
+    Returns
+    -------
+    dict mapping K → {"aic": float, "bic": float, "log_likelihood": float,
+                      "n_params": int, "n_obs": int}
+
+    Parameter count formula (full covariance, d=2 features):
+        n_params = (K-1) initial + K*(K-1) transition + K*d means
+                 + K*(d*(d+1)//2) cov   →   K² + 5K - 1   for d=2
+    """
+    from hmmlearn.hmm import GaussianHMM
+
+    feats = _build_features(close)
+    if len(feats) < 100:
+        return {}
+    X = feats.to_numpy(dtype=float)
+    n, d = X.shape
+
+    results: dict[int, dict] = {}
+    for k in range(k_range[0], k_range[1] + 1):
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                hmm = GaussianHMM(
+                    n_components=k,
+                    covariance_type="full",
+                    n_iter=n_iter,
+                    random_state=seed,
+                    tol=1e-3,
+                )
+                hmm.fit(X)
+                ll = hmm.score(X)
+        except Exception:
+            continue
+
+        # (K-1) initial probs + K*(K-1) transition + K*d means + K*(d*(d+1)//2) full cov
+        n_params = (k - 1) + k * (k - 1) + k * d + k * (d * (d + 1) // 2)
+        bic = -2 * ll + n_params * np.log(n)
+        aic = -2 * ll + 2 * n_params
+        results[k] = {
+            "aic": round(aic, 2),
+            "bic": round(bic, 2),
+            "log_likelihood": round(ll, 2),
+            "n_params": n_params,
+            "n_obs": n,
+        }
+
+    return results
+
+
 __all__ = [
     "N_STATES",
     "STATE_NAMES",
     "STATE_COLORS",
     "compute_gmm_hmm_sequence",
+    "select_hmm_k",
 ]
