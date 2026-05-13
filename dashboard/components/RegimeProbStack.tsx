@@ -5,7 +5,6 @@ import {
   AreaChart,
   Brush,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -46,9 +45,27 @@ export default function RegimeProbStack({
             Posterior P(Bull / Neutral / Bear | features) — stacked to 1.0
           </div>
         </div>
-        <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-green" />
-          <span className="text-accent-green">LIVE · {lastDate}</span>
+        <div className="flex flex-wrap items-center gap-2">
+          {[0, 1, 2].map((r) => (
+            <span
+              key={r}
+              className="inline-flex items-center gap-1.5 rounded-sm px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+              style={{
+                backgroundColor: `${REGIME_COLORS[r]}1a`,
+                color: REGIME_COLORS[r],
+              }}
+            >
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: REGIME_COLORS[r] }}
+              />
+              {REGIME_NAMES[r]}
+            </span>
+          ))}
+          <span className="ml-1 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider">
+            <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent-green" />
+            <span className="text-accent-green">LIVE · {lastDate}</span>
+          </span>
         </div>
       </div>
       <div className="h-64">
@@ -76,8 +93,9 @@ export default function RegimeProbStack({
               }}
               formatter={(value: number) => `${(value * 100).toFixed(1)}%`}
             />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
-            {[0, 1, 2].map((r) => (
+            {/* Render Bear→Neutral→Bull so Bull (green) sits at the TOP of the
+                stack when dominant — matches visual intuition: high P(Bull) = green top. */}
+            {[2, 1, 0].map((r) => (
               <Area
                 key={r}
                 type="monotone"
@@ -87,6 +105,7 @@ export default function RegimeProbStack({
                 stroke={REGIME_COLORS[r]}
                 fill={REGIME_COLORS[r]}
                 fillOpacity={0.55}
+                legendType="none"
                 isAnimationActive={false}
               />
             ))}
