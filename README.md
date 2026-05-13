@@ -1,12 +1,5 @@
 # Regime_v2 — Legendary-tier regime detector
 
-A clean-room rewrite of a six-regime market regime classifier, built
-against the prescriptions of a 56-page forensic audit of the original
-implementation. The audit scored the legacy classifier at **67.4 / 100**
-on a four-axis rubric (mathematical correctness, causal hygiene,
-statistical defensibility, ensemble contribution). The target for this
-project is **≥ 90 / 100** — the audit's "legendary" tier.
-
 ## What's in the box
 
 ```
