@@ -8,7 +8,12 @@ import EquityChart from "@/components/EquityChart";
 import RegimeProbStack from "@/components/RegimeProbStack";
 import TvtpBand from "@/components/TvtpBand";
 import TransitionHeatmap from "@/components/TransitionHeatmap";
-import { REGIME_COLORS } from "@/lib/types";
+import {
+  REGIME_ALLOC,
+  REGIME_COLORS,
+  REGIME_NAMES,
+  activeRegimeFromProbs,
+} from "@/lib/types";
 
 export const dynamicParams = false;
 
@@ -51,6 +56,16 @@ export default async function AssetPage({
   const tvtpPos = asset.current_tvtp.position;
   const tvtpColor = tvtpPos >= 0 ? "#22c55e" : "#ef4444";
 
+  // Derive the displayed regime from argmax(probs) instead of the stored hard
+  // label — the rule-baseline can flag Bear while P(Bull)=64% (see screenshot
+  // 2026-05-12). Display layer trusts what the probabilities actually say.
+  const activeLabel = activeRegimeFromProbs(
+    asset.current_regime.probs,
+    asset.current_regime.label,
+  );
+  const activeName = REGIME_NAMES[activeLabel];
+  const activeAlloc = REGIME_ALLOC[activeLabel];
+
   // pct change over last 21 bars
   const tail = asset.history.slice(-22);
   const startClose = tail[0]?.close ?? null;
@@ -89,9 +104,9 @@ export default async function AssetPage({
             </div>
             <div className="mt-2 flex items-center gap-2">
               <RegimeBadge
-                label={asset.current_regime.label}
-                name={asset.current_regime.name}
-                alloc={asset.current_regime.alloc}
+                label={activeLabel}
+                name={activeName}
+                alloc={activeAlloc}
                 size="lg"
               />
               <span className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
@@ -147,7 +162,6 @@ export default async function AssetPage({
               <div className="space-y-2">
                 {(() => {
                   const probs = asset.current_regime.probs;
-                  const activeLabel = asset.current_regime.label;
                   return probs.map((p, i) => {
                     const c = REGIME_COLORS[i] ?? "#a3a3a3";
                     const w = p === null ? 0 : Math.max(0, Math.min(1, p));
@@ -200,7 +214,7 @@ export default async function AssetPage({
                   <span style={{ color: REGIME_COLORS[asset.current_gmm.label] ?? "#a3a3a3" }}>
                     {asset.current_gmm.name}
                   </span>
-                  {asset.current_gmm.label === asset.current_regime.label ? (
+                  {asset.current_gmm.label === activeLabel ? (
                     <span className="ml-2 text-accent-green">✓ AGREES</span>
                   ) : (
                     <span className="ml-2 text-amber-400">⚠ DIVERGES</span>

@@ -98,3 +98,43 @@ export const REGIME_NAMES: Record<number, string> = {
   1: "Neutral",
   2: "Bear",
 };
+
+// Canonical positions per regime — matches the rule-baseline allocation
+// used by the strategy: Bull long, Neutral flat, Bear half-short.
+export const REGIME_ALLOC: Record<number, number> = {
+  0: 1.0,
+  1: 0.0,
+  2: -0.5,
+};
+
+// Argmax of the soft posteriors. The rule-baseline's hard `label` can lag
+// or disagree with its own probabilities (hysteresis / thresholding), which
+// produces dashboards where the badge says BEAR while P(Bull)=64%. The
+// display layer everywhere uses this helper so the active regime always
+// matches what the user sees in the probability stack.
+export function activeRegimeFromProbs(
+  probs: (number | null | undefined)[],
+  fallback: number,
+): number {
+  let best = -1;
+  let bestV = -Infinity;
+  for (let i = 0; i < probs.length; i++) {
+    const v = probs[i];
+    if (v !== null && v !== undefined && v > bestV) {
+      bestV = v;
+      best = i;
+    }
+  }
+  return best === -1 ? fallback : best;
+}
+
+// argmax of (p0, p1, p2) on a single history bar, with fallback to the
+// stored hard label if probabilities are missing.
+export function activeLabelOfBar(bar: {
+  p0: number | null;
+  p1: number | null;
+  p2: number | null;
+  label: number;
+}): number {
+  return activeRegimeFromProbs([bar.p0, bar.p1, bar.p2], bar.label);
+}

@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { AssetSummaryItem } from "@/lib/types";
-import { REGIME_COLORS } from "@/lib/types";
+import {
+  REGIME_ALLOC,
+  REGIME_COLORS,
+  REGIME_NAMES,
+  activeRegimeFromProbs,
+} from "@/lib/types";
 import RegimeBadge from "./RegimeBadge";
 
 function fmtSharpe(s: number | null | undefined): string {
@@ -17,7 +22,15 @@ export default function AssetGrid({ assets }: { assets: AssetSummaryItem[] }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {assets.map((a) => {
-        const accent = REGIME_COLORS[a.regime.label] ?? "#a3a3a3";
+        // Derive the displayed regime from argmax(probs) so the card matches
+        // the per-asset probability stack (rule-baseline hard label can lag).
+        const activeLabel = activeRegimeFromProbs(
+          a.regime.probs,
+          a.regime.label,
+        );
+        const activeName = REGIME_NAMES[activeLabel];
+        const activeAlloc = REGIME_ALLOC[activeLabel];
+        const accent = REGIME_COLORS[activeLabel] ?? "#a3a3a3";
         return (
           <Link
             key={a.safe}
@@ -39,9 +52,9 @@ export default function AssetGrid({ assets }: { assets: AssetSummaryItem[] }) {
                 <div className="text-xs text-ink-muted">{a.name}</div>
               </div>
               <RegimeBadge
-                label={a.regime.label}
-                name={a.regime.name}
-                alloc={a.regime.alloc}
+                label={activeLabel}
+                name={activeName}
+                alloc={activeAlloc}
                 size="sm"
               />
             </div>

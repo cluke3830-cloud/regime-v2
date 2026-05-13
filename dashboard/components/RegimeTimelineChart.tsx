@@ -14,7 +14,11 @@ import {
 } from "recharts";
 import { useMemo } from "react";
 import type { HistoryBar } from "@/lib/types";
-import { REGIME_COLORS, REGIME_NAMES } from "@/lib/types";
+import {
+  REGIME_COLORS,
+  REGIME_NAMES,
+  activeLabelOfBar,
+} from "@/lib/types";
 
 function ticksEveryNth<T>(arr: T[], n: number): T[] {
   return arr.filter((_, i) => i % n === 0);
@@ -30,12 +34,13 @@ function detectRegimeBands(history: HistoryBar[]): RegimeBand[] {
   if (history.length === 0) return [];
   const bands: RegimeBand[] = [];
   let curStart = history[0].date;
-  let curLabel = history[0].label;
+  let curLabel = activeLabelOfBar(history[0]);
   for (let i = 1; i < history.length; i++) {
-    if (history[i].label !== curLabel) {
+    const lbl = activeLabelOfBar(history[i]);
+    if (lbl !== curLabel) {
       bands.push({ start: curStart, end: history[i].date, label: curLabel });
       curStart = history[i].date;
-      curLabel = history[i].label;
+      curLabel = lbl;
     }
   }
   bands.push({
@@ -64,9 +69,13 @@ export default function RegimeTimelineChart({
   const dates = data.map((d) => d.date);
   const tickInterval = Math.max(1, Math.floor(history.length / 8));
 
-  // The latest bar — for the "TODAY" reference line + labeled dot
+  // The latest bar — for the "TODAY" reference line + labeled dot.
+  // Use argmax(probs) for the color and the label text so the marker matches
+  // the probability stack instead of the (potentially stale) hard label.
   const lastBar = data[data.length - 1];
-  const lastColor = REGIME_COLORS[lastBar?.label ?? 2] ?? "#a3a3a3";
+  const lastActiveLabel = lastBar ? activeLabelOfBar(lastBar) : 2;
+  const lastColor = REGIME_COLORS[lastActiveLabel] ?? "#a3a3a3";
+  const lastRegimeName = REGIME_NAMES[lastActiveLabel] ?? "—";
 
   // Default zoom: last 6 months (~126 trading days)
   const defaultStart = Math.max(0, data.length - 126);
@@ -130,7 +139,7 @@ export default function RegimeTimelineChart({
                 strokeDasharray="2 4"
                 strokeWidth={1.5}
                 label={{
-                  value: `TODAY · ${lastBar.regime}`,
+                  value: `TODAY · ${lastRegimeName}`,
                   position: "top",
                   fill: lastColor,
                   fontSize: 10,
@@ -188,16 +197,16 @@ interface TipPayload {
 function RegimeTip(props: TipPayload) {
   if (!props.active || !props.payload || props.payload.length === 0) return null;
   const p = props.payload[0].payload;
-  const color = REGIME_COLORS[p.label] ?? "#a3a3a3";
+  const activeLabel = activeLabelOfBar(p);
+  const color = REGIME_COLORS[activeLabel] ?? "#a3a3a3";
+  const name = REGIME_NAMES[activeLabel] ?? "—";
   return (
     <div className="rounded border border-bg-ring bg-bg-panel/95 p-2 font-mono text-xs shadow-2xl backdrop-blur">
       <div className="mb-1 text-ink-muted">{p.date}</div>
       <div className="text-ink">
         CLOSE <span className="text-accent-lblue">{p.close?.toFixed(2) ?? "—"}</span>
       </div>
-      <div style={{ color }}>
-        {p.regime} {p.alloc !== null ? `(${(p.alloc * 100).toFixed(0)}%)` : ""}
-      </div>
+      <div style={{ color }}>{name}</div>
       <div className="text-ink-muted">
         TVTP {p.tvtp_pos !== null ? (p.tvtp_pos >= 0 ? "+" : "") + (p.tvtp_pos * 100).toFixed(0) + "%" : "—"}
       </div>
