@@ -10,6 +10,9 @@ interface UniverseItem {
   name: string;
 }
 
+// Valid US stock ticker pattern
+const TICKER_RE = /^[A-Z0-9.\-^]{1,20}$/i;
+
 export default function TopBar({
   universe,
   generatedAt,
@@ -33,6 +36,16 @@ export default function TopBar({
     );
   }, [universe, query]);
 
+  // Show the "Analyze any US stock" row when query looks like a ticker and
+  // isn't already an exact match in the universe
+  const trimmed = query.trim().toUpperCase();
+  const isValidTicker = TICKER_RE.test(trimmed);
+  const exactMatch = universe.find((u) => u.ticker === trimmed);
+  const showAnalyzeRow = isValidTicker && !exactMatch && trimmed.length >= 1;
+
+  // Total dropdown rows including the optional analyze row
+  const totalRows = matches.length + (showAnalyzeRow ? 1 : 0);
+
   useEffect(() => {
     const close = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
@@ -43,23 +56,38 @@ export default function TopBar({
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  function go(safe: string) {
+  function go(path: string) {
     setOpen(false);
     setQuery("");
-    router.push(`/asset/${safe}`);
+    router.push(path);
+  }
+
+  function goTicker(safe: string) {
+    go(`/asset/${safe}`);
+  }
+
+  function analyzeArbitrary() {
+    go(`/asset/${trimmed}`);
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setFocusIdx((i) => Math.min(matches.length - 1, i + 1));
+      setFocusIdx((i) => Math.min(totalRows - 1, i + 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setFocusIdx((i) => Math.max(0, i - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const target = matches[focusIdx];
-      if (target) go(target.safe);
+      if (focusIdx < matches.length) {
+        const target = matches[focusIdx];
+        if (target) goTicker(target.safe);
+      } else if (showAnalyzeRow) {
+        analyzeArbitrary();
+      } else if (trimmed && isValidTicker) {
+        // Enter on empty match list — navigate to the typed ticker
+        analyzeArbitrary();
+      }
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -85,7 +113,7 @@ export default function TopBar({
         <div ref={wrapRef} className="relative flex-1 max-w-xl">
           <input
             type="text"
-            placeholder="Search asset (SPY, QQQ, TLT, BTC, JPY...)  ⌘K"
+            placeholder="Search or type any US stock ticker (AAPL, NVDA…)  ⌘K"
             value={query}
             onFocus={() => setOpen(true)}
             onChange={(e) => {
@@ -101,24 +129,45 @@ export default function TopBar({
           {open && (
             <div className="absolute left-0 right-0 top-full mt-1 max-h-96 overflow-y-auto
                             rounded border border-bg-ring bg-bg-card shadow-2xl">
-              {matches.length === 0 ? (
+              {matches.length === 0 && !showAnalyzeRow && (
                 <div className="px-3 py-2 text-sm text-ink-muted">No match.</div>
-              ) : (
-                matches.map((m, i) => (
-                  <button
-                    key={m.safe}
-                    onClick={() => go(m.safe)}
-                    onMouseEnter={() => setFocusIdx(i)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm font-mono ${
-                      i === focusIdx
-                        ? "bg-accent-dblue/40 text-ink"
-                        : "text-ink hover:bg-bg-ring/50"
-                    }`}
-                  >
-                    <span className="font-bold text-accent-lblue">{m.ticker}</span>
-                    <span className="text-xs text-ink-muted">{m.name}</span>
-                  </button>
-                ))
+              )}
+
+              {matches.map((m, i) => (
+                <button
+                  key={m.safe}
+                  onClick={() => goTicker(m.safe)}
+                  onMouseEnter={() => setFocusIdx(i)}
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm font-mono ${
+                    i === focusIdx
+                      ? "bg-accent-dblue/40 text-ink"
+                      : "text-ink hover:bg-bg-ring/50"
+                  }`}
+                >
+                  <span className="font-bold text-accent-lblue">{m.ticker}</span>
+                  <span className="text-xs text-ink-muted">{m.name}</span>
+                </button>
+              ))}
+
+              {/* On-demand analyze row for any arbitrary US stock ticker */}
+              {showAnalyzeRow && (
+                <button
+                  onClick={analyzeArbitrary}
+                  onMouseEnter={() => setFocusIdx(matches.length)}
+                  className={`flex w-full items-center justify-between border-t border-bg-ring px-3 py-2.5 text-left font-mono text-sm ${
+                    focusIdx === matches.length
+                      ? "bg-accent-dblue/40 text-ink"
+                      : "text-ink hover:bg-bg-ring/50"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-accent-green">↗ Analyze</span>
+                    <span className="font-bold text-accent-lblue">{trimmed}</span>
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wider text-ink-dim">
+                    any US stock · ~5–15s
+                  </span>
+                </button>
               )}
             </div>
           )}
