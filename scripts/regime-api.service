@@ -1,0 +1,29 @@
+[Unit]
+Description=Regime_v2 API Server (on-demand regime detection for any US ticker)
+After=network.target ibkr-gateway.service
+# Remove the ibkr-gateway dependency if using yfinance backend:
+# After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/regime-v2
+
+# Load secrets (FRED_API_KEY, REGIME_BACKEND, etc.)
+EnvironmentFile=/home/ubuntu/regime-v2/.env
+
+ExecStart=/usr/bin/python3 /home/ubuntu/regime-v2/scripts/regime_api_server.py \
+    --port 8051 \
+    --backend ibkr
+
+# Restart on crash; wait 10 s between restarts
+Restart=on-failure
+RestartSec=10
+
+# Log to journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=regime-api
+
+[Install]
+WantedBy=multi-user.target
