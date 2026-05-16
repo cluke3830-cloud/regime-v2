@@ -742,6 +742,15 @@ def main(out_dir: Optional[Path] = None, backend: str = "yfinance") -> int:
           f"agree={market_consensus['agreement_count']}/{market_consensus['n_assets']}")
 
     # summary.json — multi-asset grid + headline stats + market consensus
+    # Phase 6: rotate existing summary → summary_prev.json before overwriting
+    # so the alert system can diff prev vs curr on every run.
+    summary_path = out_dir / "summary.json"
+    summary_prev_path = out_dir / "summary_prev.json"
+    if summary_path.exists():
+        import shutil as _shutil
+        _shutil.copy2(summary_path, summary_prev_path)
+        print(f"[snapshot] rotated → {summary_prev_path.relative_to(ROOT)}")
+
     summary = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "n_assets": len(summary_assets),
@@ -751,9 +760,9 @@ def main(out_dir: Optional[Path] = None, backend: str = "yfinance") -> int:
         "assets": summary_assets,
         "consensus": market_consensus,
     }
-    with open(out_dir / "summary.json", "w") as fh:
+    with open(summary_path, "w") as fh:
         json.dump(summary, fh, indent=2)
-    print(f"[snapshot] wrote {out_dir / 'summary.json'}")
+    print(f"[snapshot] wrote {summary_path.relative_to(ROOT)}")
 
     return 0
 

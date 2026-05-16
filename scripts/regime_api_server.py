@@ -50,8 +50,15 @@ from scripts.build_dashboard_data import (  # noqa: E402
     ASSET_NAMES,
 )
 from src.features.aux_data import fetch_aux_data_bundle  # noqa: E402
+from src.alerts.dispatcher import (  # noqa: E402
+    add_subscriber,
+    count_active_subscribers,
+    remove_subscriber,
+)
 from src.regime.consensus import compute_market_consensus  # noqa: E402
 from src.validation.multi_asset import DEFAULT_UNIVERSE, load_close  # noqa: E402
+
+SUBSCRIBER_STORE = ROOT / "data" / "subscribers.json"
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -262,6 +269,61 @@ def get_market_consensus():
         json.dumps(consensus, separators=(",", ":")),
         mimetype="application/json",
     )
+
+
+# Phase 6 — Subscription management.
+# Subscribers stored in data/subscribers.json (gitignored, contains PII).
+# POST /subscribe  — add email and/or webhook
+# DELETE /subscribe — soft-delete by email
+# GET /subscribers/count — public count (no PII)
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+@app.route("/subscribe", methods=["POST"])
+def post_subscribe():
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip() or None
+    webhook_url = (body.get("webhook_url") or "").strip() or None
+    tickers = body.get("tickers") or ["*"]
+
+    if not email and not webhook_url:
+        return jsonify({"error": "provide at least one of email or webhook_url"}), 400
+    if email and not EMAIL_RE.match(email):
+        return jsonify({"error": "invalid email address"}), 400
+    if not isinstance(tickers, list):
+        return jsonify({"error": "tickers must be a list"}), 400
+
+    try:
+        sub = add_subscriber(
+            email=email,
+            webhook_url=webhook_url,
+            tickers=tickers,
+            notify_consensus=bool(body.get("notify_consensus", True)),
+            path=SUBSCRIBER_STORE,
+        )
+        return jsonify({"status": "subscribed", "email": sub.get("email"),
+                        "webhook_url": sub.get("webhook_url")}), 201
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/subscribe", methods=["DELETE"])
+def delete_subscribe():
+    body = request.get_json(silent=True) or {}
+    email = (body.get("email") or "").strip()
+    if not email:
+        return jsonify({"error": "email required"}), 400
+    found = remove_subscriber(email, path=SUBSCRIBER_STORE)
+    if found:
+        return jsonify({"status": "unsubscribed", "email": email})
+    return jsonify({"error": "email not found"}), 404
+
+
+@app.route("/subscribers/count")
+def get_subscriber_count():
+    n = count_active_subscribers(SUBSCRIBER_STORE)
+    return jsonify({"count": n})
 
 
 # ---------------------------------------------------------------------------

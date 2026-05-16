@@ -72,6 +72,11 @@ data/cache/
 *.parquet
 !tests/**/*.parquet
 
+# Phase 6 — alert subscriber list (PII: email addresses)
+data/subscribers.json
+# Previous snapshot used for diff-based alerts (regenerated on each build)
+dashboard/public/data/summary_prev.json
+
 # validation_report.md is INTENTIONALLY committed — it's the
 # audit-traceable record of the latest pipeline run. Regenerate with
 # `make validate` to update.
