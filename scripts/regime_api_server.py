@@ -151,24 +151,29 @@ def health():
     return jsonify({"status": "ok", "uptime": time.time()})
 
 
+def _get_or_compute_payload(ticker: str) -> dict:
+    """Cache-aware payload accessor used by both /regime/<T> and
+    /regime/<T>/history endpoints. Raises on compute failure."""
+    entry = _payload_cache.get(ticker)
+    if entry and time.time() - entry[1] < CACHE_TTL:
+        return entry[0]
+    backend = app.config.get("BACKEND", "yfinance")
+    payload = _compute(ticker, backend)
+    _payload_cache[ticker] = (payload, time.time())
+    return payload
+
+
 @app.route("/regime/<path:ticker>")
 def get_regime(ticker: str):
     ticker = ticker.upper().strip()
     if not TICKER_RE.match(ticker):
         return jsonify({"error": "Invalid ticker symbol"}), 400
 
-    entry = _payload_cache.get(ticker)
-    if entry and time.time() - entry[1] < CACHE_TTL:
+    if _payload_cache.get(ticker):
         print(f"[regime-api] cache hit: {ticker}", flush=True)
-        return Response(
-            json.dumps(entry[0], separators=(",", ":")),
-            mimetype="application/json",
-        )
 
-    backend = app.config.get("BACKEND", "yfinance")
     try:
-        payload = _compute(ticker, backend)
-        _payload_cache[ticker] = (payload, time.time())
+        payload = _get_or_compute_payload(ticker)
         return Response(
             json.dumps(payload, separators=(",", ":")),
             mimetype="application/json",
@@ -177,6 +182,51 @@ def get_regime(ticker: str):
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(exc)}), 500
+
+
+# Phase 2 — query-able history slice without forcing a full-payload re-build.
+# History is already bundled in the asset payload (HISTORY_BARS=504 = ~2y);
+# this endpoint just slices the tail and returns it as a thinner response.
+HISTORY_DAYS_MAX = 504  # matches HISTORY_BARS in build_dashboard_data.py
+HISTORY_DAYS_DEFAULT = 252  # ~1 year
+
+
+@app.route("/regime/<path:ticker>/history")
+def get_regime_history(ticker: str):
+    ticker = ticker.upper().strip()
+    if not TICKER_RE.match(ticker):
+        return jsonify({"error": "Invalid ticker symbol"}), 400
+
+    try:
+        days = int(request.args.get("days", HISTORY_DAYS_DEFAULT))
+    except (TypeError, ValueError):
+        return jsonify({"error": "'days' must be an integer"}), 400
+    if days < 1:
+        return jsonify({"error": "'days' must be >= 1"}), 400
+    days = min(days, HISTORY_DAYS_MAX)
+
+    try:
+        payload = _get_or_compute_payload(ticker)
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(exc)}), 500
+
+    history = payload.get("history", [])
+    sliced = history[-days:] if days < len(history) else history
+
+    response = {
+        "ticker":   payload.get("ticker", ticker),
+        "name":     payload.get("name", ticker),
+        "as_of":    payload.get("as_of"),
+        "days_requested": days,
+        "days_returned":  len(sliced),
+        "history":  sliced,
+    }
+    return Response(
+        json.dumps(response, separators=(",", ":")),
+        mimetype="application/json",
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -164,6 +164,166 @@ def _log_opinion_pool(
     return apply_log_opinion_pool(gmm_proba, tvtp_proba, mapping, eps=eps)
 
 
+# ---------------------------------------------------------------------------
+# Phase 2 — Probability API: categorical confidence + cross-model consensus
+# ---------------------------------------------------------------------------
+#
+# These promote two pieces of logic from the dashboard layer to first-class
+# API fields:
+#   - current_confidence : a categorical "how sure is the model" signal
+#     derived from the fusion posterior. The Shannon entropy was already
+#     in the payload; what was missing was the level/reason/margin a
+#     consumer can branch on without re-implementing thresholds.
+#   - model_consensus    : explicit cross-model agreement (rule + GMM +
+#     TVTP vs the fusion label). Mirrors the 2-of-3 confirmation logic
+#     in dashboard/lib/types.ts::confirmedActiveLabel but exposes it for
+#     non-dashboard clients (alerts, third-party integrations).
+
+
+def _classify_confidence(
+    probs: List[Optional[float]],
+    regime_names: Dict[int, str],
+    entropy_normalised: Optional[float],
+) -> Dict[str, Any]:
+    """Categorize regime certainty from a probability vector.
+
+    Levels follow the ULTRAPLAN spec:
+      high   : top_prob > 0.65 AND second_prob < 0.25
+      medium : top_prob > 0.50
+      low    : otherwise
+
+    score is 1 - normalized_entropy when entropy is available (closer to 1
+    means a more peaked posterior); falls back to top_prob when entropy is
+    None (e.g., fusion failed and we're staring at a rule-baseline argmax).
+    """
+    clean = [(i, float(p)) for i, p in enumerate(probs) if p is not None]
+    if not clean:
+        return {
+            "level": "low", "score": 0.0,
+            "top_regime": None, "top_prob": None,
+            "second_regime": None, "second_prob": None,
+            "margin": None,
+            "reason": "no probability vector available",
+        }
+    clean.sort(key=lambda x: x[1], reverse=True)
+    top_i, top_p = clean[0]
+    second_i, second_p = clean[1] if len(clean) > 1 else (None, 0.0)
+    margin = top_p - second_p
+
+    if top_p > 0.65 and second_p < 0.25:
+        level = "high"
+    elif top_p > 0.50:
+        level = "medium"
+    else:
+        level = "low"
+
+    if entropy_normalised is None or not math.isfinite(entropy_normalised):
+        score = float(top_p)
+    else:
+        score = float(max(0.0, min(1.0, 1.0 - entropy_normalised)))
+
+    top_name = regime_names.get(top_i, str(top_i))
+    second_name = regime_names.get(second_i, str(second_i)) if second_i is not None else None
+    reason = (
+        f"P({top_name})={top_p:.2f} leads P({second_name})={second_p:.2f} "
+        f"by {margin:.2f}"
+    )
+    if entropy_normalised is not None and math.isfinite(entropy_normalised):
+        reason += f"; entropy={entropy_normalised:.2f}"
+
+    return {
+        "level": level,
+        "score": score,
+        "top_regime": top_name,
+        "top_prob": float(top_p),
+        "second_regime": second_name,
+        "second_prob": float(second_p),
+        "margin": float(margin),
+        "reason": reason,
+    }
+
+
+def _tvtp_to_3class_label(
+    p_low_vol: Optional[float],
+    p_high_vol: Optional[float],
+) -> Optional[int]:
+    """Map TVTP's 2-state output to the 3-class {Bull=0, Neutral=1, Bear=2}.
+
+    TVTP doesn't model a Neutral state directly. We call a regime Neutral
+    when neither state dominates (max < 0.60), otherwise pick the argmax:
+    p_low_vol → Bull, p_high_vol → Bear. Returns None when both inputs
+    are None.
+    """
+    if p_low_vol is None and p_high_vol is None:
+        return None
+    pl = float(p_low_vol or 0.0)
+    ph = float(p_high_vol or 0.0)
+    top = max(pl, ph)
+    if top < 0.60:
+        return 1   # Neutral
+    return 0 if pl >= ph else 2
+
+
+def _compute_model_consensus(
+    rule_label: int,
+    gmm_label: int,
+    tvtp_low_vol: Optional[float],
+    tvtp_high_vol: Optional[float],
+    fusion_label: int,
+    regime_names: Dict[int, str],
+) -> Dict[str, Any]:
+    """Cross-model agreement diagnostic. Counts how many of the three
+    independent models (rule, GMM, TVTP) match the fused label.
+
+    Levels:
+      unanimous : all 3 agree with fusion
+      strong    : 2 of 3 agree
+      split     : 1 of 3 agrees
+      divided   : 0 of 3 agree
+    """
+    tvtp_label = _tvtp_to_3class_label(tvtp_low_vol, tvtp_high_vol)
+    voters = {
+        "rule":   int(rule_label),
+        "gmm":    int(gmm_label),
+        "tvtp":   tvtp_label if tvtp_label is None else int(tvtp_label),
+        "fusion": int(fusion_label),
+    }
+    other_models = ("rule", "gmm", "tvtp")
+    agreeing = [m for m in other_models if voters[m] == voters["fusion"]]
+    dissenting = [m for m in other_models if voters[m] is not None and voters[m] != voters["fusion"]]
+    n_valid = sum(1 for m in other_models if voters[m] is not None)
+    agreement_count = len(agreeing)
+    agreement_pct = agreement_count / n_valid if n_valid > 0 else 0.0
+
+    if agreement_count == 3:
+        level = "unanimous"
+    elif agreement_count == 2:
+        level = "strong"
+    elif agreement_count == 1:
+        level = "split"
+    else:
+        level = "divided"
+
+    return {
+        "models": {
+            "rule":   voters["rule"],
+            "gmm":    voters["gmm"],
+            "tvtp":   voters["tvtp"],
+            "fusion": voters["fusion"],
+        },
+        "model_names": {
+            "rule":   regime_names.get(voters["rule"], str(voters["rule"])),
+            "gmm":    regime_names.get(voters["gmm"], str(voters["gmm"])),
+            "tvtp":   regime_names.get(voters["tvtp"], "—") if voters["tvtp"] is not None else "—",
+            "fusion": regime_names.get(voters["fusion"], str(voters["fusion"])),
+        },
+        "agreement_count": agreement_count,
+        "agreement_pct":   float(agreement_pct),
+        "dissenters":      dissenting,
+        "level":           level,
+    }
+
+
 def _build_asset_payload(
     ticker: str, close: pd.Series, aux_bundle: dict
 ) -> Dict[str, Any]:
@@ -355,6 +515,31 @@ def _build_asset_payload(
             ],
             "entropy": _finite(last.get("fusion_entropy")),
         },
+        # Phase 2 — categorical confidence + cross-model consensus.
+        # Confidence is derived from the fusion posterior (the multi-model
+        # log-opinion-pool) because that's our best probabilistic estimate;
+        # falls back to rule-baseline probs when fusion is unavailable.
+        "current_confidence": _classify_confidence(
+            probs=(
+                [
+                    _finite(last.get("fusion_p0")),
+                    _finite(last.get("fusion_p1")),
+                    _finite(last.get("fusion_p2")),
+                ]
+                if _finite(last.get("fusion_p0")) is not None
+                else last_probs
+            ),
+            regime_names=REGIME_NAMES,
+            entropy_normalised=_finite(last.get("fusion_entropy")),
+        ),
+        "model_consensus": _compute_model_consensus(
+            rule_label=last_label,
+            gmm_label=last_gmm_label,
+            tvtp_low_vol=last_tvtp_low,
+            tvtp_high_vol=last_tvtp_high,
+            fusion_label=int(last.get("fusion_label", 1)),
+            regime_names=REGIME_NAMES,
+        ),
         "stats": ASSET_BACKTEST_STATS.get(ticker, {}),
         "transition_matrix": transition_matrix,
         "history": history,

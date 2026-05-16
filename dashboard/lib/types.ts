@@ -42,6 +42,57 @@ export interface GmmMeta {
   probs: (number | null)[];
 }
 
+// Phase 2 — categorical confidence derived from the fusion posterior.
+// level rules: high if top > 0.65 AND second < 0.25; medium if top > 0.50;
+// low otherwise. score = 1 - normalized_entropy (closer to 1 = more peaked).
+export type ConfidenceLevel = "high" | "medium" | "low";
+
+export interface CurrentConfidence {
+  level: ConfidenceLevel;
+  score: number;
+  top_regime: string | null;
+  top_prob: number | null;
+  second_regime: string | null;
+  second_prob: number | null;
+  margin: number | null;
+  reason: string;
+}
+
+// Phase 2 — cross-model agreement promoted from dashboard layer
+// (confirmedActiveLabel) to first-class API contract. Counts how many of
+// rule/gmm/tvtp match fusion's argmax. Useful for non-dashboard clients
+// (alerts, third-party integrations) that need to branch on consensus
+// without re-implementing the rules.
+export type ConsensusLevel = "unanimous" | "strong" | "split" | "divided";
+
+export interface ModelConsensus {
+  models: {
+    rule: number;
+    gmm: number;
+    tvtp: number | null;
+    fusion: number;
+  };
+  model_names: {
+    rule: string;
+    gmm: string;
+    tvtp: string;
+    fusion: string;
+  };
+  agreement_count: number;
+  agreement_pct: number;
+  dissenters: string[];
+  level: ConsensusLevel;
+}
+
+// Phase 2 — fusion meta surfaced explicitly so dashboard can read fusion.entropy
+// without poking into the payload via untyped lookups. Optional for back-compat.
+export interface FusionMeta {
+  label: number;
+  name: string;
+  probs: (number | null)[];
+  entropy: number | null;
+}
+
 export interface AssetPayload {
   ticker: string;
   name: string;
@@ -50,6 +101,11 @@ export interface AssetPayload {
   current_regime: RegimeMeta;
   current_tvtp: TvtpMeta;
   current_gmm: GmmMeta;
+  // Optional for backward-compat: payloads built before Phase 2 won't have
+  // these. Consumers should null-check before reading.
+  current_fusion?: FusionMeta;
+  current_confidence?: CurrentConfidence;
+  model_consensus?: ModelConsensus;
   stats: {
     sharpe_p05?: number;
     sharpe_p50?: number;
