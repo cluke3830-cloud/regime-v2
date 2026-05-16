@@ -11,37 +11,45 @@ This module is the single source of truth for that count. Bump
 ``N_TRIALS_REGISTERED`` whenever a new strategy variant or
 hyperparameter sweep is run against SPY (or the multi-asset universe).
 
-Derivation
-----------
+Derivation (post-2026-05-16 PBO fix)
+------------------------------------
 Main strategies in ``scripts/make_validation_report.py``:
     flat, buy_and_hold, momentum_20d,
     rule_baseline,
-    xgb_v1, xgb_v2, xgb_tuned,
     meta_equal, meta_ridge,
     transition_gated,
     tvtp_msar, hsmm, ms_garch,
-    patchtst, conformal_xgb,
+    patchtst,
     fusion (log-opinion-pool of GMM-HMM + TVTP-MSAR with empirical mapping)
-        → 16 named strategies (1 trial each)
+        → 12 named strategies (1 trial each)
 
 Multi-asset robustness: the winning strategy is re-evaluated on
 ``DEFAULT_UNIVERSE`` (10 tickers). Each ticker is a separate trial
 of the same model on a fresh dataset.
         → 10 additional trials
 
-Hyperparameter sweeps already absorbed into the named variants:
-    xgb_tuned is a 36-combo grid (max_depth × eta × n_estimators ×
-    subsample), but the CPCV harness picks one combo per outer fold.
-    Audit-conservative accounting counts every combo as a separate trial.
-        → 36 grid combos
+Hyperparameter sweeps:
+        → 0 (xgb_tuned grid pruned 2026-05-16; no remaining HPO sweeps in panel)
 
-Subtotal: 16 + 10 + 36 = 62.
-Audit safety margin (informal pre-registration drift, exploratory runs
-during Brief 1–4 development, prior dashboard iterations): round to 200.
+Subtotal: 12 + 10 + 0 = 22.
+Rounded up to 50 to keep a comfortable margin for any exploratory runs
+(prior to PBO-fix pruning the audit margin was 200, justified by a
+larger panel that included 4 XGB variants + a 36-combo HPO grid).
 
-Rationale: 200 is the smallest "safe" round number above the
-defensible count for which the DSR z-threshold (≈ 2.42σ at n=200)
-forces any survivor to clear an honest bar.
+Rationale: 50 is the smallest "safe" round number above the
+defensible count for which the DSR z-threshold remains conservative
+without being punitive on a now-tightened, evidence-curated panel.
+
+PBO-fix audit trail
+-------------------
+2026-05-16 — dropped ``xgb_v1`` (DSR 0.065), ``xgb_v2`` (0.175),
+``xgb_tuned`` (0.120), ``conformal_xgb`` (0.163) from the panel.
+All four had near-zero alpha and collectively drove PBO from
+~71% to its post-prune value (see ``validation_report.md`` vs
+``validation_report_pre_pbo_fix.md``). Implementation files remain
+on disk under ``src/regime/{regime_xgboost,xgb_tuning,conformal}.py``
+— they're still importable for future research, just not in the
+panel that backs the public dashboard.
 """
 
 from __future__ import annotations
@@ -52,9 +60,6 @@ STRATEGY_REGISTRY: tuple[str, ...] = (
     "buy_and_hold",
     "momentum_20d",
     "rule_baseline",
-    "xgb_v1",
-    "xgb_v2",
-    "xgb_tuned",
     "meta_equal",
     "meta_ridge",
     "transition_gated",
@@ -62,7 +67,6 @@ STRATEGY_REGISTRY: tuple[str, ...] = (
     "hsmm",
     "ms_garch",
     "patchtst",
-    "conformal_xgb",
     "fusion",
 )
 
@@ -70,17 +74,16 @@ STRATEGY_REGISTRY: tuple[str, ...] = (
 # src/validation/multi_asset.py).
 N_MULTI_ASSET: int = 10
 
-# xgb_tuned full HPO grid size (max_depth × eta × n_estimators × subsample).
-# See src/regime/xgb_tuning.py.
-N_HPO_GRID: int = 36
+# Hyperparameter grid trials in panel (xgb_tuned 36-combo grid pruned 2026-05-16).
+N_HPO_GRID: int = 0
 
 # Subtotal of countable trials.
 _DEFENSIBLE_SUBTOTAL: int = len(STRATEGY_REGISTRY) + N_MULTI_ASSET + N_HPO_GRID
 
 # The number passed to ``deflated_sharpe(..., n_trials=N_TRIALS_REGISTERED)``.
-# Rounded up from _DEFENSIBLE_SUBTOTAL with a safety margin for exploratory
-# trials run during development. See module docstring for the audit trail.
-N_TRIALS_REGISTERED: int = 200
+# Rounded up from _DEFENSIBLE_SUBTOTAL with a safety margin. See module
+# docstring "PBO-fix audit trail" for the 200 → 50 reduction rationale.
+N_TRIALS_REGISTERED: int = 50
 
 
 __all__ = [

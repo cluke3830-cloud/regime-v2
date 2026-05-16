@@ -1,0 +1,281 @@
+{
+  "generated_at": "2026-05-14T22:36:49Z",
+  "n_assets": 10,
+  "regime_names": {
+    "0": "Bull",
+    "1": "Neutral",
+    "2": "Bear"
+  },
+  "regime_alloc": {
+    "0": 1.0,
+    "1": 0.0,
+    "2": -0.5
+  },
+  "regime_colors": {
+    "0": "#22c55e",
+    "1": "#a3a3a3",
+    "2": "#ef4444"
+  },
+  "assets": [
+    {
+      "ticker": "SPY",
+      "safe": "SPY",
+      "name": "S&P 500",
+      "as_of": "2026-05-14",
+      "close": 748.1699829101562,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.562241538297267,
+          0.2864226658233119,
+          0.15133579587942117
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.977737510023136,
+        "p_high_vol": 0.022262489976863933,
+        "position": 0.9710587630300769,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 1.025,
+      "max_dd_p50": -0.113
+    },
+    {
+      "ticker": "QQQ",
+      "safe": "QQQ",
+      "name": "Nasdaq 100",
+      "as_of": "2026-05-14",
+      "close": 719.7899780273438,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.577559015416189,
+          0.281521241376588,
+          0.14091974320722286
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.8695495100537574,
+        "p_high_vol": 0.13045048994624267,
+        "position": 0.8304143630698846,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.958,
+      "max_dd_p50": -0.128
+    },
+    {
+      "ticker": "DIA",
+      "safe": "DIA",
+      "name": "Dow Jones",
+      "as_of": "2026-05-14",
+      "close": 500.79998779296875,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.4935595338845054,
+          0.31638633426460033,
+          0.19005413185089426
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.9787061707020643,
+        "p_high_vol": 0.021293829297935742,
+        "position": 0.9723180219126836,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.937,
+      "max_dd_p50": -0.123
+    },
+    {
+      "ticker": "IWM",
+      "safe": "IWM",
+      "name": "Russell 2000",
+      "as_of": "2026-05-14",
+      "close": 284.45001220703125,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.54038598399386,
+          0.2894603062438023,
+          0.1701537097623378
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.9769155362398695,
+        "p_high_vol": 0.02308446376013053,
+        "position": 0.9699901971118303,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.284,
+      "max_dd_p50": -0.157
+    },
+    {
+      "ticker": "EFA",
+      "safe": "EFA",
+      "name": "Developed ex-US",
+      "as_of": "2026-05-14",
+      "close": 103.45999908447266,
+      "regime": {
+        "label": 1,
+        "name": "Neutral",
+        "alloc": 0.0,
+        "color": "#a3a3a3",
+        "probs": [
+          0.3143113068819007,
+          0.37142730358524967,
+          0.3142613895328496
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.8531348568494931,
+        "p_high_vol": 0.1468651431505069,
+        "position": 0.8090753139043411,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.259,
+      "max_dd_p50": -0.15
+    },
+    {
+      "ticker": "EEM",
+      "safe": "EEM",
+      "name": "Emerging Markets",
+      "as_of": "2026-05-14",
+      "close": 67.37999725341797,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.3832064114191664,
+          0.3225960085801812,
+          0.2941975800006523
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.2844128882721438,
+        "p_high_vol": 0.7155871117278563,
+        "position": 0.0697367547537869,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.153,
+      "max_dd_p50": -0.175
+    },
+    {
+      "ticker": "GLD",
+      "safe": "GLD",
+      "name": "Gold",
+      "as_of": "2026-05-14",
+      "close": 427.2099914550781,
+      "regime": {
+        "label": 1,
+        "name": "Neutral",
+        "alloc": 0.0,
+        "color": "#a3a3a3",
+        "probs": [
+          0.30079619681029557,
+          0.3420274919979265,
+          0.35717631119177795
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.8923988103618699,
+        "p_high_vol": 0.10760118963813023,
+        "position": 0.8601184534704308,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.65,
+      "max_dd_p50": -0.153
+    },
+    {
+      "ticker": "TLT",
+      "safe": "TLT",
+      "name": "20Y Treasuries",
+      "as_of": "2026-05-14",
+      "close": 84.91999816894531,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.37072855187730974,
+          0.3368254517976836,
+          0.2924459963250066
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.9889952064608295,
+        "p_high_vol": 0.011004793539170492,
+        "position": 0.9856937683990784,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": -0.082,
+      "max_dd_p50": -0.205
+    },
+    {
+      "ticker": "BTC-USD",
+      "safe": "BTC-USD",
+      "name": "Bitcoin",
+      "as_of": "2026-05-14",
+      "close": 81472.2890625,
+      "regime": {
+        "label": 2,
+        "name": "Bear",
+        "alloc": -0.5,
+        "color": "#ef4444",
+        "probs": [
+          0.6075678293084248,
+          0.21613042470961147,
+          0.17630174598196383
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.8410199346923258,
+        "p_high_vol": 0.15898006530767428,
+        "position": 0.7933259151000236,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.93,
+      "max_dd_p50": -0.23
+    },
+    {
+      "ticker": "JPY=X",
+      "safe": "JPY_X",
+      "name": "USD / JPY",
+      "as_of": "2026-05-14",
+      "close": 158.36000061035156,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.466510558167601,
+          0.32813387525020155,
+          0.20535556658219742
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.6221370313199354,
+        "p_high_vol": 0.3778629686800646,
+        "position": 0.508778140715916,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": 0.328,
+      "max_dd_p50": -0.129
+    }
+  ]
+}
