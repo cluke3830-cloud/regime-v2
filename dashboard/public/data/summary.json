@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-05-15T22:29:50Z",
-  "n_assets": 10,
+  "generated_at": "2026-05-16T22:10:28Z",
+  "n_assets": 15,
   "regime_names": {
     "0": "Bull",
     "1": "Neutral",
@@ -29,15 +29,15 @@
         "alloc": 1.0,
         "color": "#22c55e",
         "probs": [
-          0.5858249403070119,
-          0.2729555284240497,
-          0.14121953126893833
+          0.5858249505020032,
+          0.27295546327837894,
+          0.14121958621961786
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.8652770805289953,
-        "p_high_vol": 0.13472291947100473,
-        "position": 0.8248602046876939,
+        "p_low_vol": 0.8652743036344629,
+        "p_high_vol": 0.13472569636553716,
+        "position": 0.8248565947248018,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": 1.025,
@@ -55,15 +55,15 @@
         "alloc": 1.0,
         "color": "#22c55e",
         "probs": [
-          0.6018767121460639,
-          0.26589271712821433,
-          0.13223057072572184
+          0.601876735864189,
+          0.265892699162876,
+          0.13223056497293498
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.6666633728864639,
-        "p_high_vol": 0.3333366271135361,
-        "position": 0.566662384752403,
+        "p_low_vol": 0.6666686596538539,
+        "p_high_vol": 0.33333134034614614,
+        "position": 0.5666692575500101,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": 0.958,
@@ -81,15 +81,15 @@
         "alloc": 1.0,
         "color": "#22c55e",
         "probs": [
-          0.523856065578493,
-          0.3066007006945036,
-          0.16954323372700345
+          0.5238558433789766,
+          0.30660076291257266,
+          0.16954339370845073
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.9057645121835473,
-        "p_high_vol": 0.09423548781645275,
-        "position": 0.8774938658386114,
+        "p_low_vol": 0.9199744500794406,
+        "p_high_vol": 0.08002554992055937,
+        "position": 0.8959667851032728,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": 0.937,
@@ -107,15 +107,15 @@
         "alloc": 1.0,
         "color": "#22c55e",
         "probs": [
-          0.5735256225747227,
-          0.27445409018035705,
-          0.15202028724492025
+          0.573525550055251,
+          0.2744541276330606,
+          0.15202032231168838
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.6164272134203296,
-        "p_high_vol": 0.3835727865796705,
-        "position": 0.5013553774464284,
+        "p_low_vol": 0.6164231192532285,
+        "p_high_vol": 0.38357688074677165,
+        "position": 0.5013500550291969,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": 0.284,
@@ -133,15 +133,15 @@
         "alloc": 0.0,
         "color": "#a3a3a3",
         "probs": [
-          0.34227873770884115,
-          0.3601970296258863,
-          0.2975242326652725
+          0.34227873555656163,
+          0.36019702862535763,
+          0.2975242358180807
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.5409402127004757,
-        "p_high_vol": 0.4590597872995243,
-        "position": 0.40322227651061837,
+        "p_low_vol": 0.5409425489640098,
+        "p_high_vol": 0.4590574510359901,
+        "position": 0.4032253136532128,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": 0.259,
@@ -159,15 +159,15 @@
         "alloc": 1.0,
         "color": "#22c55e",
         "probs": [
-          0.43846469958914785,
-          0.30393449385332566,
-          0.25760080655752643
+          0.4384646518432587,
+          0.30393457502124877,
+          0.2576007731354925
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.007734875622291454,
-        "p_high_vol": 0.9922651243777086,
-        "position": -0.2899446616910211,
+        "p_low_vol": 0.007735031649599032,
+        "p_high_vol": 0.992264968350401,
+        "position": -0.2899444588555212,
         "state": "High-Vol Defense"
       },
       "sharpe_p50": 0.153,
@@ -185,9 +185,9 @@
         "alloc": 0.0,
         "color": "#a3a3a3",
         "probs": [
-          0.3011744939435171,
-          0.34171310935294996,
-          0.35711239670353306
+          0.30117458546787645,
+          0.34171313970760464,
+          0.3571122748245189
         ]
       },
       "tvtp": {
@@ -211,15 +211,15 @@
         "alloc": 1.0,
         "color": "#22c55e",
         "probs": [
-          0.3928560876067711,
-          0.3262533042325339,
-          0.28089060816069505
+          0.39278827264210303,
+          0.32624093589267744,
+          0.2809707914652196
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.9376112535710661,
-        "p_high_vol": 0.06238874642893393,
-        "position": 0.9188946296423859,
+        "p_low_vol": 0.9376075270218153,
+        "p_high_vol": 0.06239247297818483,
+        "position": 0.9188897851283598,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": -0.082,
@@ -229,23 +229,23 @@
       "ticker": "BTC-USD",
       "safe": "BTC-USD",
       "name": "Bitcoin",
-      "as_of": "2026-05-15",
-      "close": 79028.9921875,
+      "as_of": "2026-05-16",
+      "close": 78141.1875,
       "regime": {
         "label": 2,
         "name": "Bear",
         "alloc": -0.5,
         "color": "#ef4444",
         "probs": [
-          0.6250260507971639,
-          0.20902789769103514,
-          0.16594605151180092
+          0.5762991860438391,
+          0.22974645119391723,
+          0.1939543627622436
         ]
       },
       "tvtp": {
-        "p_low_vol": 0.8065490319600223,
-        "p_high_vol": 0.1934509680399778,
-        "position": 0.748513741548029,
+        "p_low_vol": 0.8704676523401287,
+        "p_high_vol": 0.12953234765987143,
+        "position": 0.8316079480421672,
         "state": "Low-Vol Bull"
       },
       "sharpe_p50": 0.93,
@@ -276,6 +276,289 @@
       },
       "sharpe_p50": 0.328,
       "max_dd_p50": -0.129
+    },
+    {
+      "ticker": "EURUSD=X",
+      "safe": "EURUSD_X",
+      "name": "EUR / USD",
+      "as_of": "2026-05-15",
+      "close": 1.163061261177063,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.42238518517324763,
+          0.31422960299200825,
+          0.263385211834744
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.9719200616169605,
+        "p_high_vol": 0.028079938383039443,
+        "position": 0.9634960801020487,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": null,
+      "max_dd_p50": null
+    },
+    {
+      "ticker": "GBPUSD=X",
+      "safe": "GBPUSD_X",
+      "name": "GBP / USD",
+      "as_of": "2026-05-15",
+      "close": 1.3323917388916016,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.4436763688685973,
+          0.31090607977890733,
+          0.24541755135249532
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.6481242026885744,
+        "p_high_vol": 0.3518757973114256,
+        "position": 0.5425614634951468,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": null,
+      "max_dd_p50": null
+    },
+    {
+      "ticker": "AUDUSD=X",
+      "safe": "AUDUSD_X",
+      "name": "AUD / USD",
+      "as_of": "2026-05-16",
+      "close": 0.7153075933456421,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.4444063375270295,
+          0.3551864911173557,
+          0.2004071713556149
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.7923915999741638,
+        "p_high_vol": 0.20760840002583633,
+        "position": 0.7301090799664128,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": null,
+      "max_dd_p50": null
+    },
+    {
+      "ticker": "ETH-USD",
+      "safe": "ETH-USD",
+      "name": "Ethereum",
+      "as_of": "2026-05-16",
+      "close": 2179.47998046875,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.5454221998400497,
+          0.2363533541560057,
+          0.21822444600394464
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.8938396633405525,
+        "p_high_vol": 0.10616033665944749,
+        "position": 0.8619915623427183,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": null,
+      "max_dd_p50": null
+    },
+    {
+      "ticker": "SOL-USD",
+      "safe": "SOL-USD",
+      "name": "Solana",
+      "as_of": "2026-05-16",
+      "close": 86.44999694824219,
+      "regime": {
+        "label": 0,
+        "name": "Bull",
+        "alloc": 1.0,
+        "color": "#22c55e",
+        "probs": [
+          0.5275592979567199,
+          0.24836409975926396,
+          0.22407660228401619
+        ]
+      },
+      "tvtp": {
+        "p_low_vol": 0.9803529863420967,
+        "p_high_vol": 0.019647013657903317,
+        "position": 0.9744588822447257,
+        "state": "Low-Vol Bull"
+      },
+      "sharpe_p50": null,
+      "max_dd_p50": null
     }
-  ]
+  ],
+  "consensus": {
+    "regime": "Bull",
+    "regime_label": 0,
+    "level": "split",
+    "agreement_count": 8,
+    "agreement_pct": 0.5333333333333333,
+    "n_assets": 15,
+    "n_failed": 0,
+    "mean_confidence": 0.8146371366677345,
+    "regime_counts": {
+      "Bull": 8,
+      "Neutral": 6,
+      "Bear": 1
+    },
+    "voters": [
+      {
+        "ticker": "SPY",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.9681385656454207,
+        "agrees": true
+      },
+      {
+        "ticker": "QQQ",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.9996661904345454,
+        "agrees": true
+      },
+      {
+        "ticker": "DIA",
+        "regime_label": 1,
+        "regime": "Neutral",
+        "top_prob": 0.5238558433789766,
+        "agrees": false
+      },
+      {
+        "ticker": "IWM",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.9998626117057696,
+        "agrees": true
+      },
+      {
+        "ticker": "EFA",
+        "regime_label": 1,
+        "regime": "Neutral",
+        "top_prob": 0.9870085318614235,
+        "agrees": false
+      },
+      {
+        "ticker": "EEM",
+        "regime_label": 2,
+        "regime": "Bear",
+        "top_prob": 0.9994611448495222,
+        "agrees": false
+      },
+      {
+        "ticker": "GLD",
+        "regime_label": 1,
+        "regime": "Neutral",
+        "top_prob": 0.3571122748245189,
+        "agrees": false
+      },
+      {
+        "ticker": "TLT",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.8084425698807245,
+        "agrees": true
+      },
+      {
+        "ticker": "BTC-USD",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.9999698188029348,
+        "agrees": true
+      },
+      {
+        "ticker": "JPY=X",
+        "regime_label": 1,
+        "regime": "Neutral",
+        "top_prob": 0.492158975745943,
+        "agrees": false
+      },
+      {
+        "ticker": "EURUSD=X",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.9042425249901058,
+        "agrees": true
+      },
+      {
+        "ticker": "GBPUSD=X",
+        "regime_label": 1,
+        "regime": "Neutral",
+        "top_prob": 0.4436763688685973,
+        "agrees": false
+      },
+      {
+        "ticker": "AUDUSD=X",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.5894422974708253,
+        "agrees": true
+      },
+      {
+        "ticker": "ETH-USD",
+        "regime_label": 1,
+        "regime": "Neutral",
+        "top_prob": 0.9997571908602557,
+        "agrees": false
+      },
+      {
+        "ticker": "SOL-USD",
+        "regime_label": 0,
+        "regime": "Bull",
+        "top_prob": 0.9999973294441173,
+        "agrees": true
+      }
+    ],
+    "dissenters": [
+      {
+        "ticker": "DIA",
+        "regime": "Neutral"
+      },
+      {
+        "ticker": "EFA",
+        "regime": "Neutral"
+      },
+      {
+        "ticker": "EEM",
+        "regime": "Bear"
+      },
+      {
+        "ticker": "GLD",
+        "regime": "Neutral"
+      },
+      {
+        "ticker": "JPY=X",
+        "regime": "Neutral"
+      },
+      {
+        "ticker": "GBPUSD=X",
+        "regime": "Neutral"
+      },
+      {
+        "ticker": "ETH-USD",
+        "regime": "Neutral"
+      }
+    ],
+    "failed_extractions": []
+  }
 }

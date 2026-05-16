@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-15T22:29:50Z",
+  "generated_at": "2026-05-16T22:10:28Z",
   "universe": [
     {
       "ticker": "SPY",
@@ -50,6 +50,31 @@
       "ticker": "JPY=X",
       "safe": "JPY_X",
       "name": "USD / JPY"
+    },
+    {
+      "ticker": "EURUSD=X",
+      "safe": "EURUSD_X",
+      "name": "EUR / USD"
+    },
+    {
+      "ticker": "GBPUSD=X",
+      "safe": "GBPUSD_X",
+      "name": "GBP / USD"
+    },
+    {
+      "ticker": "AUDUSD=X",
+      "safe": "AUDUSD_X",
+      "name": "AUD / USD"
+    },
+    {
+      "ticker": "ETH-USD",
+      "safe": "ETH-USD",
+      "name": "Ethereum"
+    },
+    {
+      "ticker": "SOL-USD",
+      "safe": "SOL-USD",
+      "name": "Solana"
     }
   ]
 }
