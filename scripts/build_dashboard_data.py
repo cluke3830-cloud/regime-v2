@@ -57,16 +57,20 @@ from src.validation.multi_asset import DEFAULT_UNIVERSE, load_close  # noqa: E40
 
 # Pretty names for the asset cards
 ASSET_NAMES: Dict[str, str] = {
-    "SPY":     "S&P 500",
-    "QQQ":     "Nasdaq 100",
-    "DIA":     "Dow Jones",
-    "IWM":     "Russell 2000",
-    "EFA":     "Developed ex-US",
-    "EEM":     "Emerging Markets",
-    "GLD":     "Gold",
-    "TLT":     "20Y Treasuries",
-    "BTC-USD": "Bitcoin",
-    "JPY=X":   "USD / JPY",
+    "SPY":      "S&P 500",
+    "QQQ":      "Nasdaq 100",
+    "DIA":      "Dow Jones",
+    "IWM":      "Russell 2000",
+    "EFA":      "Developed ex-US",
+    "EEM":      "Emerging Markets",
+    "GLD":      "Gold",
+    "TLT":      "20Y Treasuries",
+    "BTC-USD":  "Bitcoin",
+    "JPY=X":    "USD / JPY",
+    # Phase 7 — Forex expansion
+    "EURUSD=X": "EUR / USD",
+    "GBPUSD=X": "GBP / USD",
+    "AUDUSD=X": "AUD / USD",
 }
 
 # 3-regime color palette (Bloomberg dark)

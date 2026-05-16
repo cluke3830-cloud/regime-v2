@@ -317,12 +317,15 @@ def test_evaluate_one_asset_handles_too_few_bars(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_default_universe_has_10_tickers():
-    assert len(DEFAULT_UNIVERSE) == 10
+def test_default_universe_has_13_tickers():
+    assert len(DEFAULT_UNIVERSE) == 13  # 10 original + 3 Forex (Phase 7)
     # spans equity, fixed income, gold, crypto, FX
     assert "SPY" in DEFAULT_UNIVERSE
     assert "TLT" in DEFAULT_UNIVERSE
     assert "GLD" in DEFAULT_UNIVERSE
+    assert "EURUSD=X" in DEFAULT_UNIVERSE
+    assert "GBPUSD=X" in DEFAULT_UNIVERSE
+    assert "AUDUSD=X" in DEFAULT_UNIVERSE
     assert "BTC-USD" in DEFAULT_UNIVERSE
 
 

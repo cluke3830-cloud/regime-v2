@@ -238,8 +238,8 @@ def get_regime_history(ticker: str):
 
 
 # Phase 4 — cross-asset market consensus. Aggregates per-asset fusion
-# labels across the fixed DEFAULT_UNIVERSE (10 tickers: SPY, QQQ, DIA,
-# IWM, EFA, EEM, GLD, TLT, BTC-USD, JPY=X). Each call uses the cached
+# labels across DEFAULT_UNIVERSE (13 tickers after Phase 7 Forex expansion).
+# Each call uses the cached
 # per-asset payloads when warm; cold starts trigger 10 ticker computes
 # which can take ~30-60s before the cache warms up.
 

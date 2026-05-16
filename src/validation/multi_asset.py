@@ -58,6 +58,10 @@ DEFAULT_UNIVERSE: List[str] = [
     "TLT",      # Long-duration US treasuries
     "BTC-USD",  # Bitcoin
     "JPY=X",    # USD/JPY currency
+    # Phase 7 — Forex expansion (major pairs via yfinance =X suffix)
+    "EURUSD=X", # EUR/USD — most-liquid FX pair
+    "GBPUSD=X", # GBP/USD — Cable
+    "AUDUSD=X", # AUD/USD — commodity-linked currency
 ]
 
 
