@@ -41,9 +41,11 @@ def test_spy_cheaper_than_eem():
     assert ASSET_COST_BPS["SPY"] < ASSET_COST_BPS["EEM"]
 
 
-def test_btc_most_expensive():
-    non_btc = [v for k, v in ASSET_COST_BPS.items() if k not in ("BTC-USD", "_default")]
-    assert ASSET_COST_BPS["BTC-USD"] > max(non_btc)
+def test_crypto_most_expensive():
+    """Crypto assets should be the most expensive in the universe (widest spreads)."""
+    crypto = {"BTC-USD", "ETH-USD", "SOL-USD"}
+    non_crypto = [v for k, v in ASSET_COST_BPS.items() if k not in crypto | {"_default"}]
+    assert max(ASSET_COST_BPS[t] for t in crypto) > max(non_crypto)
 
 
 # ---------------------------------------------------------------------------

@@ -71,6 +71,9 @@ ASSET_NAMES: Dict[str, str] = {
     "EURUSD=X": "EUR / USD",
     "GBPUSD=X": "GBP / USD",
     "AUDUSD=X": "AUD / USD",
+    # Phase 8 — Crypto expansion
+    "ETH-USD":  "Ethereum",
+    "SOL-USD":  "Solana",
 }
 
 # 3-regime color palette (Bloomberg dark)

@@ -48,6 +48,8 @@ ASSET_COST_BPS: dict[str, float] = {
     "TLT": 1.0,
     # Crypto — much wider spread on CME/Coinbase pass-through
     "BTC-USD": 10.0,
+    "ETH-USD": 12.0,  # slightly wider than BTC
+    "SOL-USD": 15.0,  # less liquid, wider still
     # FX — interbank spreads, very tight (major pairs)
     "JPY=X":    0.5,
     "EURUSD=X": 0.5,  # most-liquid FX pair

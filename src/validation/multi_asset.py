@@ -62,6 +62,9 @@ DEFAULT_UNIVERSE: List[str] = [
     "EURUSD=X", # EUR/USD — most-liquid FX pair
     "GBPUSD=X", # GBP/USD — Cable
     "AUDUSD=X", # AUD/USD — commodity-linked currency
+    # Phase 8 — Crypto expansion
+    "ETH-USD",  # Ethereum
+    "SOL-USD",  # Solana
 ]
 
 
