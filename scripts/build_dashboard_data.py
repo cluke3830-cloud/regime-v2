@@ -540,10 +540,43 @@ def _build_asset_payload(
             fusion_label=int(last.get("fusion_label", 1)),
             regime_names=REGIME_NAMES,
         ),
+        # Phase 3 — heuristic transition-risk signal (model-free; uses the
+        # fusion posterior history for margin compression + second-prob
+        # acceleration, and fusion-label streaks for persistence-vs-typical).
+        # The trained XGBoost detector in src.regime.transition_detector
+        # remains the strategy-layer signal (it gates `transition_gated`
+        # inside CPCV); these heuristics are the website-layer signal and
+        # surface *why* the risk is elevated rather than a black-box score.
+        "transition_risk": _build_transition_risk(aligned, REGIME_NAMES),
         "stats": ASSET_BACKTEST_STATS.get(ticker, {}),
         "transition_matrix": transition_matrix,
         "history": history,
     }
+
+
+def _build_transition_risk(
+    aligned: pd.DataFrame,
+    regime_names: Dict[int, str],
+) -> Dict[str, Any]:
+    """Pick the best available probability+label series and hand them to
+    ``compute_transition_risk``. Prefers fusion (multi-model posterior),
+    falls back to rule-baseline when fusion didn't converge."""
+    from src.regime.transition_detector import compute_transition_risk
+
+    fusion_cols = ["fusion_p0", "fusion_p1", "fusion_p2"]
+    if (all(c in aligned.columns for c in fusion_cols)
+            and not aligned[fusion_cols].iloc[-1].isna().all()):
+        prob_hist = aligned[fusion_cols].to_numpy(dtype=float)
+        label_hist = aligned["fusion_label"].to_numpy(dtype=np.int64)
+        source = "fusion"
+    else:
+        prob_hist = aligned[["p_0", "p_1", "p_2"]].to_numpy(dtype=float)
+        label_hist = aligned["label"].to_numpy(dtype=np.int64)
+        source = "rule_baseline"
+
+    risk = compute_transition_risk(prob_hist, label_hist, regime_names=regime_names)
+    risk["source_model"] = source
+    return risk
 
 
 def _empirical_transition_matrix(labels: np.ndarray, n_states: int) -> List[List[float]]:

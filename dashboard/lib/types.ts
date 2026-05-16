@@ -93,6 +93,54 @@ export interface FusionMeta {
   entropy: number | null;
 }
 
+// Phase 3 — heuristic transition-risk signal. Composed from three model-free
+// sub-signals on the fusion posterior history:
+//   margin_compression       — top-second prob margin shrinking
+//   regime_persistence       — current regime overstaying vs typical p75 duration
+//   second_prob_acceleration — second-best regime's prob rising fast
+// Level rules: high if combined >= 0.65 OR any sub-score >= 0.75;
+// medium if combined >= 0.35; low otherwise.
+export type TransitionRiskLevel = "high" | "medium" | "low";
+export type TransitionRiskSource = "fusion" | "rule_baseline";
+
+export interface TransitionRiskComponentMargin {
+  score: number;
+  compression_pct: number | null;
+  margin_now: number | null;
+  margin_lookback: number | null;
+}
+
+export interface TransitionRiskComponentPersistence {
+  score: number;
+  current_streak: number;
+  typical_p75: number | null;
+  persistence_percentile: number;
+}
+
+export interface TransitionRiskComponentAcceleration {
+  score: number;
+  second_regime: string;
+  delta: number | null;
+  second_prob_now: number | null;
+}
+
+export interface TransitionRisk {
+  level: TransitionRiskLevel;
+  score: number;
+  current_regime: string;
+  days_in_regime: number;
+  typical_p75_duration: number | null;
+  expected_remaining_days: number;
+  top_alternative_regime: string;
+  components: {
+    margin_compression: TransitionRiskComponentMargin;
+    regime_persistence: TransitionRiskComponentPersistence;
+    second_prob_acceleration: TransitionRiskComponentAcceleration;
+  };
+  reasons: string[];
+  source_model: TransitionRiskSource;
+}
+
 export interface AssetPayload {
   ticker: string;
   name: string;
@@ -106,6 +154,7 @@ export interface AssetPayload {
   current_fusion?: FusionMeta;
   current_confidence?: CurrentConfidence;
   model_consensus?: ModelConsensus;
+  transition_risk?: TransitionRisk;
   stats: {
     sharpe_p05?: number;
     sharpe_p50?: number;
