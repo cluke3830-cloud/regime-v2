@@ -32,7 +32,7 @@ export default async function AssetPage({
     <main className="min-h-screen">
       <TopBar universe={index.universe} generatedAt={summary.generated_at} />
       {asset ? (
-        <AssetDetail asset={asset} />
+        <AssetDetail asset={asset} modelRunAt={summary.generated_at} />
       ) : (
         <DynamicAssetLoader ticker={params.ticker.toUpperCase()} />
       )}

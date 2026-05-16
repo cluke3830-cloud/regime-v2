@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FreshnessChip from "@/components/FreshnessChip";
 import RegimeBadge from "@/components/RegimeBadge";
 import RegimeTimelineChart from "@/components/RegimeTimelineChart";
 import EquityChart from "@/components/EquityChart";
@@ -54,7 +55,13 @@ function Stat({
   );
 }
 
-export default function AssetDetail({ asset }: { asset: AssetPayload }) {
+export default function AssetDetail({
+  asset,
+  modelRunAt,
+}: {
+  asset: AssetPayload;
+  modelRunAt?: string;
+}) {
   const tvtpPos = asset.current_tvtp.position;
   const tvtpColor = tvtpPos >= 0 ? "#22c55e" : "#ef4444";
 
@@ -100,6 +107,7 @@ export default function AssetDetail({ asset }: { asset: AssetPayload }) {
             <span className="font-mono text-[10px] uppercase tracking-wider text-ink-dim">
               AS OF {asset.as_of}
             </span>
+            {modelRunAt && <FreshnessChip modelRunAt={modelRunAt} />}
           </div>
         </div>
 

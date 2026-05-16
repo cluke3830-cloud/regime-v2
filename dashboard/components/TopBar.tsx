@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import FreshnessChip from "@/components/FreshnessChip";
 
 interface UniverseItem {
   ticker: string;
@@ -185,6 +186,7 @@ export default function TopBar({
           <span className="text-ink-dim">•</span>
           <span className="text-ink-dim">DATA AS OF</span>
           <span className="text-ink">{generatedAt.slice(0, 10)}</span>
+          <FreshnessChip modelRunAt={generatedAt} />
         </nav>
       </div>
     </header>
