@@ -178,6 +178,40 @@ export interface AssetSummaryItem {
   max_dd_p50: number | null;
 }
 
+// Phase 4 — cross-asset market consensus. Aggregates per-asset fusion
+// labels across the universe. Level rules: strong >= 80%, moderate >= 60%,
+// split >= 40%, divided < 40%. Powers MarketConsensusPanel on the
+// dashboard home page above the asset grid.
+export type MarketConsensusLevel = "strong" | "moderate" | "split" | "divided";
+
+export interface MarketConsensusVoter {
+  ticker: string;
+  regime_label: number;
+  regime: string;
+  top_prob: number | null;
+  agrees: boolean;
+}
+
+export interface MarketConsensusDissenter {
+  ticker: string;
+  regime: string;
+}
+
+export interface MarketConsensus {
+  regime: string | null;
+  regime_label: number | null;
+  level: MarketConsensusLevel;
+  agreement_count: number;
+  agreement_pct: number;
+  n_assets: number;
+  n_failed: number;
+  mean_confidence: number | null;
+  regime_counts: Record<string, number>;
+  voters: MarketConsensusVoter[];
+  dissenters: MarketConsensusDissenter[];
+  failed_extractions: string[];
+}
+
 export interface SummaryPayload {
   generated_at: string;
   n_assets: number;
@@ -185,6 +219,8 @@ export interface SummaryPayload {
   regime_alloc: Record<string, number>;
   regime_colors: Record<string, string>;
   assets: AssetSummaryItem[];
+  // Optional for back-compat with summaries generated before Phase 4.
+  consensus?: MarketConsensus;
 }
 
 export interface AssetIndex {

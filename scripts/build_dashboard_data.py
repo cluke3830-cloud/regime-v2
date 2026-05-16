@@ -721,7 +721,27 @@ def main(out_dir: Optional[Path] = None, backend: str = "yfinance") -> int:
         )
         return 1
 
-    # summary.json — multi-asset grid + headline stats
+    # Phase 4 — cross-asset market consensus. Aggregates the per-asset
+    # fusion labels into a market-wide call so the dashboard can show
+    # "8 of 10 assets agree on Bull (strong consensus)" without each
+    # client re-implementing the tally. Built from the FULL payloads
+    # (not summary_assets) because consensus needs current_fusion +
+    # current_confidence, neither of which is in the summary entry shape.
+    full_payloads = []
+    for entry in summary_assets:
+        safe = entry["safe"]
+        try:
+            with open(regimes_dir / f"{safe}.json") as fh:
+                full_payloads.append(json.load(fh))
+        except Exception as exc:
+            print(f"  ! consensus: failed to re-read {safe}.json: {exc}")
+    from src.regime.consensus import compute_market_consensus  # noqa: PLC0415
+    market_consensus = compute_market_consensus(full_payloads, regime_names=REGIME_NAMES)
+    print(f"[snapshot] market consensus: regime={market_consensus['regime']}  "
+          f"level={market_consensus['level']}  "
+          f"agree={market_consensus['agreement_count']}/{market_consensus['n_assets']}")
+
+    # summary.json — multi-asset grid + headline stats + market consensus
     summary = {
         "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "n_assets": len(summary_assets),
@@ -729,6 +749,7 @@ def main(out_dir: Optional[Path] = None, backend: str = "yfinance") -> int:
         "regime_alloc": REGIME_ALLOC,
         "regime_colors": REGIME_COLORS,
         "assets": summary_assets,
+        "consensus": market_consensus,
     }
     with open(out_dir / "summary.json", "w") as fh:
         json.dump(summary, fh, indent=2)

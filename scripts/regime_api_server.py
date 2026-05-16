@@ -50,7 +50,8 @@ from scripts.build_dashboard_data import (  # noqa: E402
     ASSET_NAMES,
 )
 from src.features.aux_data import fetch_aux_data_bundle  # noqa: E402
-from src.validation.multi_asset import load_close  # noqa: E402
+from src.regime.consensus import compute_market_consensus  # noqa: E402
+from src.validation.multi_asset import DEFAULT_UNIVERSE, load_close  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -225,6 +226,40 @@ def get_regime_history(ticker: str):
     }
     return Response(
         json.dumps(response, separators=(",", ":")),
+        mimetype="application/json",
+    )
+
+
+# Phase 4 — cross-asset market consensus. Aggregates per-asset fusion
+# labels across the fixed DEFAULT_UNIVERSE (10 tickers: SPY, QQQ, DIA,
+# IWM, EFA, EEM, GLD, TLT, BTC-USD, JPY=X). Each call uses the cached
+# per-asset payloads when warm; cold starts trigger 10 ticker computes
+# which can take ~30-60s before the cache warms up.
+
+
+@app.route("/regime/market")
+def get_market_consensus():
+    universe = DEFAULT_UNIVERSE
+    asset_payloads = []
+    errors = []
+    for ticker in universe:
+        try:
+            asset_payloads.append(_get_or_compute_payload(ticker))
+        except Exception as exc:  # noqa: BLE001
+            errors.append({"ticker": ticker, "error": str(exc)})
+            print(f"[regime-api] market: {ticker} compute failed: {exc}", flush=True)
+
+    if not asset_payloads:
+        return jsonify({
+            "error": "no assets could be loaded for the market consensus",
+            "failed": errors,
+        }), 500
+
+    consensus = compute_market_consensus(asset_payloads)
+    consensus["errors"] = errors
+    consensus["universe"] = list(universe)
+    return Response(
+        json.dumps(consensus, separators=(",", ":")),
         mimetype="application/json",
     )
 
