@@ -75,6 +75,18 @@ def _build_smtp_config() -> dict | None:
     }
 
 
+def _build_resend_config() -> dict | None:
+    api_key = os.environ.get("RESEND_API_KEY")
+    if not api_key:
+        return None
+    return {
+        "api_key": api_key,
+        "from_email": os.environ.get(
+            "ALERT_FROM_EMAIL", "Regime Monitor <alerts@resend.dev>"
+        ),
+    }
+
+
 def cmd_send(args: argparse.Namespace) -> int:
     if not CURR_PATH.exists():
         print(f"[alerts] {CURR_PATH} not found — run build_dashboard_data.py first", file=sys.stderr)
@@ -103,20 +115,28 @@ def cmd_send(args: argparse.Namespace) -> int:
         cc = report["consensus_change"]
         print(f"  consensus: {cc['from_regime']} ({cc['from_level']}) → {cc['to_regime']} ({cc['to_level']})")
 
-    smtp_config = None if args.dry_run else _build_smtp_config()
-    if not args.dry_run and smtp_config is None:
-        print("[alerts] no SMTP config — email delivery disabled (webhooks still fire)")
+    if args.dry_run:
+        resend_config = None
+        smtp_config = None
+    else:
+        resend_config = _build_resend_config()
+        smtp_config = None if resend_config else _build_smtp_config()
+        if not (resend_config or smtp_config):
+            print("[alerts] no email backend (set RESEND_API_KEY or ALERT_SMTP_*) — "
+                  "email delivery disabled (webhooks still fire)")
 
     result = dispatch_alerts(
         report,
         subscriber_store_path=STORE_PATH,
         smtp_config=smtp_config,
+        resend_config=resend_config,
         dry_run=args.dry_run,
     )
 
     print(
         f"[alerts] dispatch complete: sent={result['sent']}  "
-        f"skipped={result['skipped']}  errors={len(result['errors'])}"
+        f"skipped={result['skipped']}  errors={len(result['errors'])}  "
+        f"backend={result.get('backend','?')}"
     )
     for err in result["errors"]:
         print(f"  ! {err}", file=sys.stderr)

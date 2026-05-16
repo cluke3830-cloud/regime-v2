@@ -1,8 +1,9 @@
-"""Alert dispatcher for regime change events (Phase 6).
+"""Alert dispatcher for regime change events (Phase 6 + 9).
 
-Supports two delivery channels (configurable per subscriber):
-  - Email  — SMTP (works with Gmail app passwords, SendGrid, SES SMTP)
-  - Webhook — HTTP POST (works with Slack incoming webhooks, Zapier, n8n)
+Email delivery — picks the first configured backend in priority order:
+  1. Resend     (Phase 9, recommended) — set RESEND_API_KEY
+  2. SMTP       (Phase 6, fallback)    — set ALERT_SMTP_HOST/USER/PASS
+Webhook delivery — HTTP POST (Slack incoming webhooks, Zapier, n8n)
 
 Subscriber store
 ----------------
@@ -293,6 +294,45 @@ def _send_email(
         srv.sendmail(msg["From"], [to], msg.as_string())
 
 
+def _send_via_resend(
+    to: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+    api_key: str,
+    from_email: str,
+) -> None:
+    """Send via Resend HTTP API (https://resend.com/docs/api-reference/emails).
+
+    Vastly simpler than SMTP — single bearer token, no app passwords,
+    free tier covers 3,000 emails/month and 100/day.
+    """
+    payload = {
+        "from": from_email,
+        "to": [to],
+        "subject": subject,
+        "text": text_body,
+        "html": html_body,
+    }
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "RegimeMonitor/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            if resp.status >= 400:
+                raise RuntimeError(f"Resend returned HTTP {resp.status}")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")[:200]
+        raise RuntimeError(f"Resend HTTP {e.code}: {body}") from e
+
+
 def _send_webhook(url: str, payload: Dict[str, Any], timeout: int = 10) -> None:
     data = json.dumps(payload).encode()
     req = urllib.request.Request(
@@ -315,6 +355,7 @@ def dispatch_alerts(
     change_report: Dict[str, Any],
     subscribers: Optional[List[Dict[str, Any]]] = None,
     smtp_config: Optional[Dict[str, Any]] = None,
+    resend_config: Optional[Dict[str, Any]] = None,
     subscriber_store_path: Optional[Path] = None,
     dry_run: bool = False,
 ) -> Dict[str, Any]:
@@ -326,9 +367,11 @@ def dispatch_alerts(
         Output of ``detect_regime_changes``.
     subscribers : list, optional
         Explicit subscriber list. Loads from store if None.
+    resend_config : dict, optional
+        ``{api_key, from_email}`` — recommended path (Phase 9).
     smtp_config : dict, optional
-        Keys: host, port, user, password, from_email.
-        Required for email delivery. If None, email is skipped.
+        ``{host, port, user, password, from_email}`` — legacy fallback.
+        Resend wins when both are set.
     subscriber_store_path : Path, optional
         Path to subscribers.json. Uses default if None.
     dry_run : bool
@@ -337,10 +380,16 @@ def dispatch_alerts(
     Returns
     -------
     dict
-        ``{sent: int, skipped: int, errors: [str], dry_run: bool}``
+        ``{sent: int, skipped: int, errors: [str], dry_run: bool, backend: str}``
     """
     if subscribers is None:
         subscribers = load_subscribers(subscriber_store_path)
+
+    backend = (
+        "resend" if resend_config
+        else "smtp" if smtp_config
+        else "none"
+    )
 
     sent = 0
     skipped = 0
@@ -356,17 +405,28 @@ def dispatch_alerts(
         text_body = _format_text_body(filtered)
         html_body = _format_html_body(filtered)
 
-        # Email delivery
-        if sub.get("email") and smtp_config:
+        # Email delivery — Resend takes priority over SMTP when both configured
+        if sub.get("email"):
             if dry_run:
-                print(f"[dry-run] email → {sub['email']}  subject: {subject}")
+                print(f"[dry-run] email ({backend}) → {sub['email']}  subject: {subject}")
+                print(text_body)
                 sent += 1
-            else:
+            elif resend_config:
+                try:
+                    _send_via_resend(
+                        sub["email"], subject, text_body, html_body,
+                        api_key=resend_config["api_key"],
+                        from_email=resend_config.get("from_email", "alerts@resend.dev"),
+                    )
+                    sent += 1
+                except Exception as exc:
+                    errors.append(f"resend:{sub['email']}: {exc}")
+            elif smtp_config:
                 try:
                     _send_email(sub["email"], subject, text_body, html_body, smtp_config)
                     sent += 1
                 except Exception as exc:
-                    errors.append(f"email:{sub['email']}: {exc}")
+                    errors.append(f"smtp:{sub['email']}: {exc}")
 
         # Webhook delivery
         if sub.get("webhook_url"):
@@ -390,6 +450,7 @@ def dispatch_alerts(
         "skipped": skipped,
         "errors": errors,
         "dry_run": dry_run,
+        "backend": backend,
     }
 
 

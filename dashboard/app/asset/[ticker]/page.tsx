@@ -1,6 +1,7 @@
 import { loadAsset, loadAssetIndex, loadSummary } from "@/lib/data";
 import TopBar from "@/components/TopBar";
 import AssetDetail from "@/components/AssetDetail";
+import SignInButton from "@/components/SignInButton";
 import DynamicAssetLoader from "./DynamicAssetLoader";
 
 // Pre-build the fixed 10-asset universe at build time; any other ticker is
@@ -30,7 +31,11 @@ export default async function AssetPage({
 
   return (
     <main className="min-h-screen">
-      <TopBar universe={index.universe} generatedAt={summary.generated_at} />
+      <TopBar
+        universe={index.universe}
+        generatedAt={summary.generated_at}
+        authSlot={<SignInButton />}
+      />
       {asset ? (
         <AssetDetail asset={asset} modelRunAt={summary.generated_at} />
       ) : (

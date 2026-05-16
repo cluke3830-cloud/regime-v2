@@ -194,6 +194,43 @@ class TestDispatch:
         assert result["skipped"] == 1
         assert result["sent"] == 0
 
+    def test_resend_preferred_over_smtp_when_both_set(self, monkeypatch):
+        resend_calls, smtp_calls = [], []
+        monkeypatch.setattr(
+            "src.alerts.dispatcher._send_via_resend",
+            lambda *a, **kw: resend_calls.append(kw.get("api_key")),
+        )
+        monkeypatch.setattr(
+            "src.alerts.dispatcher._send_email",
+            lambda *a, **kw: smtp_calls.append(a),
+        )
+        subs = [{"email": "t@example.com", "tickers": ["*"],
+                 "notify_consensus": True, "active": True}]
+        result = dispatch_alerts(
+            self._report(), subscribers=subs,
+            resend_config={"api_key": "re_xyz", "from_email": "f@x.com"},
+            smtp_config={"host": "h", "port": 587, "user": "u", "password": "p"},
+        )
+        assert resend_calls == ["re_xyz"]  # Resend used
+        assert smtp_calls == []             # SMTP skipped
+        assert result["backend"] == "resend"
+        assert result["sent"] == 1
+
+    def test_resend_error_recorded_not_raised(self, monkeypatch):
+        monkeypatch.setattr(
+            "src.alerts.dispatcher._send_via_resend",
+            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("rate limited")),
+        )
+        subs = [{"email": "t@example.com", "tickers": ["*"],
+                 "notify_consensus": True, "active": True}]
+        result = dispatch_alerts(
+            self._report(), subscribers=subs,
+            resend_config={"api_key": "re_xyz", "from_email": "f@x.com"},
+        )
+        assert result["errors"]
+        assert "rate limited" in result["errors"][0]
+        assert result["sent"] == 0
+
     def test_webhook_error_recorded_not_raised(self, monkeypatch):
         monkeypatch.setattr(
             "src.alerts.dispatcher._send_webhook",

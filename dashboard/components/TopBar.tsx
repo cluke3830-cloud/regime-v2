@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import FreshnessChip from "@/components/FreshnessChip";
 
+// Sign-in button is rendered server-side (uses auth()), so it's passed in as
+// a slot rather than imported directly into this client component.
+
 interface UniverseItem {
   ticker: string;
   safe: string;
@@ -17,9 +20,11 @@ const TICKER_RE = /^[A-Z0-9.\-^]{1,20}$/i;
 export default function TopBar({
   universe,
   generatedAt,
+  authSlot,
 }: {
   universe: UniverseItem[];
   generatedAt: string;
+  authSlot?: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -188,6 +193,8 @@ export default function TopBar({
           <span className="text-ink">{generatedAt.slice(0, 10)}</span>
           <FreshnessChip modelRunAt={generatedAt} />
         </nav>
+
+        {authSlot && <div className="ml-auto md:ml-0">{authSlot}</div>}
       </div>
     </header>
   );

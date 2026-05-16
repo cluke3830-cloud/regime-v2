@@ -60,6 +60,24 @@ from src.validation.multi_asset import DEFAULT_UNIVERSE, load_close  # noqa: E40
 
 SUBSCRIBER_STORE = ROOT / "data" / "subscribers.json"
 
+# Phase 9 — shared secret between the Next.js /api/subscribe proxy and this
+# backend. Set REGIME_API_TOKEN to the same value in both environments so
+# nobody can hit the backend's subscription endpoints directly without
+# going through the auth-gated Next.js route. If unset, the guard is
+# disabled (useful for local dev; never deploy that way to prod).
+REGIME_API_TOKEN = os.environ.get("REGIME_API_TOKEN")
+
+
+def _require_api_token() -> Optional[tuple]:
+    """Returns a Flask error response tuple if the token check fails, None on pass."""
+    if not REGIME_API_TOKEN:
+        return None  # guard disabled
+    auth_header = request.headers.get("Authorization", "")
+    expected = f"Bearer {REGIME_API_TOKEN}"
+    if auth_header != expected:
+        return jsonify({"error": "invalid or missing API token"}), 401
+    return None
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -282,6 +300,9 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 @app.route("/subscribe", methods=["POST"])
 def post_subscribe():
+    guard = _require_api_token()
+    if guard is not None:
+        return guard
     body = request.get_json(silent=True) or {}
     email = (body.get("email") or "").strip() or None
     webhook_url = (body.get("webhook_url") or "").strip() or None
@@ -310,6 +331,9 @@ def post_subscribe():
 
 @app.route("/subscribe", methods=["DELETE"])
 def delete_subscribe():
+    guard = _require_api_token()
+    if guard is not None:
+        return guard
     body = request.get_json(silent=True) or {}
     email = (body.get("email") or "").strip()
     if not email:

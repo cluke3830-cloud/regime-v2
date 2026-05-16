@@ -1,6 +1,8 @@
 import { loadAssetIndex, loadSummary } from "@/lib/data";
 import TopBar from "@/components/TopBar";
 import AssetGrid from "@/components/AssetGrid";
+import SignInButton from "@/components/SignInButton";
+import SubscribeButton from "@/components/SubscribeButton";
 
 export default async function HomePage() {
   const [index, summary] = await Promise.all([loadAssetIndex(), loadSummary()]);
@@ -17,6 +19,7 @@ export default async function HomePage() {
       <TopBar
         universe={index.universe}
         generatedAt={summary.generated_at}
+        authSlot={<SignInButton />}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-6">
@@ -26,10 +29,13 @@ export default async function HomePage() {
               Multi-Asset Regime Universe
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-ink-muted">
-              10 assets · TVTP-MSAR champion (Hamilton 2-state MS-AR) + 3-regime
-              rule baseline. Backtest stats are 45-path CPCV OOS Sharpe;
-              snapshots refresh daily.
+              {summary.assets.length} assets · TVTP-MSAR champion (Hamilton
+              2-state MS-AR) + 3-regime rule baseline. Backtest stats are
+              45-path CPCV OOS Sharpe; snapshots refresh daily.
             </p>
+            <div className="mt-3">
+              <SubscribeButton />
+            </div>
           </div>
           <div className="flex gap-2">
             <Kpi
